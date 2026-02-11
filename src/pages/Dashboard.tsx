@@ -56,7 +56,9 @@ export function Dashboard() {
       .then(setUpcomingSundayCount);
   }, [upcomingSun]);
 
-  const bySunday: Record<string, MonthInterviewRow[]> = monthInterviews.reduce((acc, row) => {
+  const today = todayLocalDate();
+  const monthUpcoming = monthInterviews.filter((row) => row.localDate >= today);
+  const bySunday: Record<string, MonthInterviewRow[]> = monthUpcoming.reduce((acc, row) => {
     if (!acc[row.localDate]) acc[row.localDate] = [];
     acc[row.localDate].push(row);
     return acc;
