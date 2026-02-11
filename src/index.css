@@ -1,0 +1,257 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens – spacing 8px grid, min tap 44px, radius 8px */
+:root {
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #1a1a1a;
+  background-color: #f5f5f5;
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  --space-unit: 8px;
+  --radius: 8px;
+  --min-tap: 44px;
+  --color-primary: #1a365d;
+  --color-muted: #64748b;
+  --color-border: #e2e8f0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  margin: 0;
+  min-height: 100%;
+  height: 100%;
+}
+
+body {
+  padding: 0;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  /* No top padding so fixed header can extend to true top */
+}
+
+/* Fixed app header: full-bleed blue to top, safe area respected */
+.app-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background-color: var(--color-primary);
+  color: white;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: 0.75rem;
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 3.5rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.main-below-header {
+  padding-top: calc(3.5rem + env(safe-area-inset-top));
+}
+
+a {
+  color: #1a365d;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Day view – timeline and blocks (layout only; buttons/links use Tailwind) */
+.day-view-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.day-view-date {
+  margin-bottom: 1rem;
+}
+
+.day-view-timeline {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.day-view-time-column {
+  position: absolute;
+  left: 0;
+  width: 4.5rem;
+  top: 0;
+  bottom: 0;
+}
+
+.day-view-time-slot {
+  position: absolute;
+  left: 0;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: #64748b;
+  transform: translateY(-50%);
+}
+
+.day-view-blocks {
+  position: absolute;
+  left: 5rem;
+  right: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.day-view-block {
+  position: absolute;
+  left: 0.25rem;
+  right: 0.25rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+  min-height: 24px;
+}
+
+.day-view-block--recurring {
+  background: #f1f5f9;
+  color: #1a1a1a;
+}
+
+.day-view-block--block {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #065f46;
+}
+
+.day-view-block--interview {
+  background: #e0e7ff;
+  border-color: #c7d2fe;
+  color: #1e3a8a;
+}
+
+.day-view-block-time {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  color: inherit;
+  opacity: 0.9;
+}
+
+.day-view-block-label {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.day-view-block-label-link {
+  color: inherit;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.day-view-block-label-link:hover {
+  text-decoration: underline;
+}
+
+.day-view-block-menu-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.day-view-block-menu-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.8;
+  border-radius: 4px;
+}
+
+.day-view-block-menu-btn:hover {
+  opacity: 1;
+  background: rgba(0,0,0,0.08);
+}
+
+.day-view-add-btn {
+  text-decoration: none;
+  margin-left: auto;
+}
+
+.day-view-add-btn:hover {
+  text-decoration: none;
+}
+
+.day-view-actions {
+  margin-top: 0.5rem;
+  margin-bottom: 0;
+}
+
+.day-view-send {
+  margin-top: 1.5rem;
+}
+
+/* Shared card and list styles for consistent app UI */
+.card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  overflow: hidden;
+}
+
+.card-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: var(--min-tap);
+  padding: 0.75rem 1rem;
+  text-decoration: none;
+  color: inherit;
+  border-bottom: 1px solid var(--color-border);
+  transition: background 0.15s ease;
+}
+
+.card-row:last-child {
+  border-bottom: none;
+}
+
+.card-row:hover {
+  background: #f8fafc;
+}
+
+.card-row:active {
+  background: #f1f5f9;
+}

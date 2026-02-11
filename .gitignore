@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# Logs and debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# TypeScript / Vite
+*.tsbuildinfo
+vite.config.d.ts
+
+# Optional: uncomment if you don't want to commit Firebase config
+# .firebaserc
+# firebase.json

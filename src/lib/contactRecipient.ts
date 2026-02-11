@@ -1,0 +1,45 @@
+/**
+ * UC-7.2: Resolve the correct message recipient for a person.
+ * For youth: default to parent (per household defaultContactPreference); use youth only if allowed and number exists.
+ */
+
+import { db } from '../db/schema';
+import type { Person } from '../db/schema';
+
+/**
+ * Returns the phone number to use when sending a message to or about this person.
+ * For youth: uses household defaultContactPreference (text_mom, text_dad, both, individual).
+ * For adult/primary: uses person.phones[0].
+ * Returns null if no suitable number is found.
+ */
+export async function getMessageRecipientPhone(person: Person): Promise<string | null> {
+  if (person.role !== 'youth') {
+    return person.phones?.[0] ?? null;
+  }
+
+  const household = await db.households.get(person.householdId);
+  if (!household) {
+    return person.phones?.[0] ?? null;
+  }
+
+  const preference = household.defaultContactPreference ?? 'text_mom';
+  if (preference === 'individual' && person.phones?.length) {
+    return person.phones[0];
+  }
+
+  const members = await db.people.where('householdId').equals(person.householdId).toArray();
+  const head = members.find((p) => p.householdRole === 'HEAD' && p.id !== person.id);
+  const spouse = members.find((p) => p.householdRole === 'SPOUSE' && p.id !== person.id);
+
+  if (preference === 'text_mom' || preference === 'text_dad') {
+    const parent = preference === 'text_mom' ? (spouse ?? head) : (head ?? spouse);
+    const phone = parent?.phones?.[0];
+    if (phone) return phone;
+  }
+  if (preference === 'both') {
+    const phone = (head ?? spouse)?.phones?.[0] ?? spouse?.phones?.[0];
+    if (phone) return phone;
+  }
+
+  return person.phones?.[0] ?? null;
+}
