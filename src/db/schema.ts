@@ -5,7 +5,7 @@
 
 import Dexie, { type EntityTable } from 'dexie';
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 export type HouseholdRole = 'HEAD' | 'SPOUSE' | 'OTHER';
 export type PersonRole = 'adult' | 'youth' | 'primary';
@@ -245,6 +245,23 @@ export interface CustomInterviewToGet {
   completedAt?: number;
 }
 
+/** Advancement (priesthood) interview marked complete or scheduled – so it no longer appears in list. */
+export interface AdvancementCompletion {
+  id: string;
+  personId: string;
+  office: 'Deacon' | 'Teacher' | 'Priest';
+  completedAt: number;
+  createdAt: number;
+}
+
+/** Baptism interview marked complete or scheduled – so it no longer appears in list. */
+export interface BaptismCompletion {
+  id: string;
+  personId: string;
+  completedAt: number;
+  createdAt: number;
+}
+
 export class BishopricDb extends Dexie {
   households!: EntityTable<Household, 'id'>;
   people!: EntityTable<Person, 'id'>;
@@ -265,6 +282,8 @@ export class BishopricDb extends Dexie {
   interviewToGetDismissals!: EntityTable<InterviewToGetDismissal, 'id'>;
   interviewToGetNotes!: EntityTable<InterviewToGetNote, 'id'>;
   customInterviewToGet!: EntityTable<CustomInterviewToGet, 'id'>;
+  advancementCompletions!: EntityTable<AdvancementCompletion, 'id'>;
+  baptismCompletions!: EntityTable<BaptismCompletion, 'id'>;
 
   constructor() {
     super('BishopricDb');
@@ -298,6 +317,10 @@ export class BishopricDb extends Dexie {
       interviewToGetDismissals: 'id, personId, reasonKey, periodKey, createdAt',
       interviewToGetNotes: 'id, personId, reasonKey, updatedAt, [personId+reasonKey]',
       customInterviewToGet: 'id, personId, createdAt, completedAt',
+    });
+    this.version(7).stores({
+      advancementCompletions: 'id, personId, office, completedAt, createdAt',
+      baptismCompletions: 'id, personId, completedAt, createdAt',
     });
   }
 }

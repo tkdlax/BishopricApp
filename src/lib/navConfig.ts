@@ -32,7 +32,7 @@ export const ALL_NAV_ITEMS: NavItemConfig[] = [
   { id: 'contacts', path: '/contacts', label: 'Contacts', Icon: Users },
   { id: 'day', path: '/day', label: 'Day view', Icon: List },
   { id: 'schedules', path: '/schedules', label: 'Schedules', Icon: ClipboardList },
-  { id: 'interviews-to-get', path: '/interviews-to-get', label: 'Interviews to get', Icon: ClipboardCheck },
+  { id: 'interviews-to-get', path: '/interviews-to-get', label: 'Interviews', Icon: ClipboardCheck },
   { id: 'tithing', path: '/tithing', label: 'Tithing', Icon: CircleDollarSign },
   { id: 'prayer', path: '/prayer', label: 'Prayer', Icon: Heart },
   { id: 'settings', path: '/settings', label: 'Settings', Icon: Settings },

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { db } from '../db/schema';
 import { PageLayout, Section } from '../components/ui';
 import {
@@ -10,15 +10,24 @@ import {
   type AdvancementCandidate,
   type BaptismCandidate,
 } from '../lib/youthInterviews';
-import { REACH_OUT_INTERVIEW_TYPES } from '../lib/reachOutTemplate';
+import { REACH_OUT_INTERVIEW_TYPES, buildReachOutMessage } from '../lib/reachOutTemplate';
+import { getYouthReachOutBody } from '../lib/templates';
+import { getBishopLastNameForMessage } from '../lib/bishopForMessages';
+import { getHouseholdMembersWithPhones } from '../lib/contactRecipient';
 import { PeoplePickerModal } from '../components/PeoplePickerModal';
-import { User, Plus, ChevronDown, ChevronRight, Check } from 'lucide-react';
+import { User, Plus, ChevronDown, ChevronRight, Check, Calendar } from 'lucide-react';
 import type { Person } from '../db/schema';
 
 const PERIOD_KEY = `${new Date().getFullYear()}-H1`;
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+type ReachOutTarget =
+  | { kind: 'advancement'; candidate: AdvancementCandidate }
+  | { kind: 'baptism'; candidate: BaptismCandidate }
+  | { kind: 'youth'; item: YouthDueItem };
+
 export function InterviewsToGet() {
+  const navigate = useNavigate();
   const [youthDue, setYouthDue] = useState<YouthDueItem[]>([]);
   const [advancement, setAdvancement] = useState<AdvancementCandidate[]>([]);
   const [baptism, setBaptism] = useState<BaptismCandidate[]>([]);
@@ -28,22 +37,29 @@ export function InterviewsToGet() {
   const [showAddCustom, setShowAddCustom] = useState(false);
   const [showPersonPicker, setShowPersonPicker] = useState(false);
   const [customPerson, setCustomPerson] = useState<Person | null>(null);
-  const [customType, setCustomType] = useState(REACH_OUT_INTERVIEW_TYPES[0]?.type ?? 'standard_interview');
+  const [customType, setCustomType] = useState(REACH_OUT_INTERVIEW_TYPES[0]?.type ?? 'temple_recommend');
+  const [reachOutTarget, setReachOutTarget] = useState<ReachOutTarget | null>(null);
+  const [scheduleMenu, setScheduleMenu] = useState<string | null>(null);
+  const [bulkAddQueue, setBulkAddQueue] = useState<YouthDueItem[]>([]);
 
   useEffect(() => {
     load();
   }, []);
 
   async function load() {
-    const [people, customList, dismissList] = await Promise.all([
+    const [people, customList, dismissList, advDone, bapDone] = await Promise.all([
       db.people.toArray(),
       db.customInterviewToGet.toArray().then((list) => list.filter((c) => !c.completedAt)),
       db.interviewToGetDismissals.where('periodKey').equals(PERIOD_KEY).toArray(),
+      db.advancementCompletions.toArray(),
+      db.baptismCompletions.toArray(),
     ]);
     const youthItems = people.flatMap((p) => getYouthDueThisYear(p));
     setYouthDue(youthItems);
-    setAdvancement(getAdvancementCandidates(people));
-    setBaptism(getBaptismCandidates(people));
+    const advCompleted = new Set(advDone.map((a) => `${a.personId}-${a.office}`));
+    const bapCompleted = new Set(bapDone.map((b) => b.personId));
+    setAdvancement(getAdvancementCandidates(people).filter((c) => !advCompleted.has(`${c.person.id}-${c.office}`)));
+    setBaptism(getBaptismCandidates(people).filter((c) => !bapCompleted.has(c.person.id)));
     setCustom(customList.map((c) => ({ id: c.id, label: c.label, personId: c.personId, completedAt: c.completedAt })));
     setDismissals(new Set(dismissList.map((d) => `${d.personId}-${d.reasonKey}`)));
   }
@@ -82,6 +98,98 @@ export function InterviewsToGet() {
   async function completeCustom(id: string) {
     await db.customInterviewToGet.update(id, { completedAt: Date.now() });
     load();
+  }
+
+  async function completeAdvancement(c: AdvancementCandidate) {
+    const now = Date.now();
+    await db.advancementCompletions.add({
+      id: `adv-${now}-${Math.random().toString(36).slice(2, 9)}`,
+      personId: c.person.id,
+      office: c.office,
+      completedAt: now,
+      createdAt: now,
+    });
+    setScheduleMenu(null);
+    load();
+  }
+
+  async function completeBaptism(c: BaptismCandidate) {
+    const now = Date.now();
+    await db.baptismCompletions.add({
+      id: `bap-${now}-${Math.random().toString(36).slice(2, 9)}`,
+      personId: c.person.id,
+      completedAt: now,
+      createdAt: now,
+    });
+    setScheduleMenu(null);
+    load();
+  }
+
+  function openReachOut(target: ReachOutTarget) {
+    setScheduleMenu(null);
+    setReachOutTarget(target);
+  }
+
+  function scheduleCalendar(target: ReachOutTarget) {
+    setScheduleMenu(null);
+    const personId = target.kind === 'advancement' ? target.candidate.person.id : target.kind === 'baptism' ? target.candidate.person.id : target.item.person.id;
+    navigate('/schedule', { state: { personId } });
+  }
+
+  async function pickRecipientForReachOut(recipient: Person) {
+    if (!reachOutTarget) return;
+    await addReachOutToQueue(reachOutTarget, recipient);
+    setReachOutTarget(null);
+  }
+
+  async function addReachOutToQueue(target: ReachOutTarget, recipient: Person) {
+    const bishopLastName = await getBishopLastNameForMessage();
+    const recipientName = recipient.nameListPreferred;
+    const phone = recipient.phones?.[0];
+    if (!phone) return;
+    let interviewTypeDisplay: string;
+    if (target.kind === 'advancement') {
+      interviewTypeDisplay = `${target.candidate.office} ordination interview`;
+    } else if (target.kind === 'baptism') {
+      interviewTypeDisplay = 'baptism interview';
+    } else {
+      const item = target.item;
+      interviewTypeDisplay = item.reason === 'birthday_month'
+        ? 'youth annual with the bishop'
+        : 'youth semi-annual with a counselor';
+      if (item.leader === 'bishop') interviewTypeDisplay = item.reason === 'birthday_month' ? 'youth annual with the bishop' : 'youth semi-annual with the bishop';
+      else interviewTypeDisplay = 'youth semi-annual with a counselor';
+    }
+    let message: string;
+    if (target.kind === 'youth') {
+      const body = await getYouthReachOutBody();
+      message = body
+        .replace(/\{recipient\}/g, recipientName)
+        .replace(/\{bishopPhrase\}/g, bishopLastName ? `bishop ${bishopLastName}` : 'the bishop')
+        .replace(/\{interviewType\}/g, interviewTypeDisplay);
+    } else {
+      message = buildReachOutMessage(recipientName, bishopLastName, interviewTypeDisplay);
+    }
+    const now = Date.now();
+    await db.messageQueue.add({
+      id: `msg-${now}-${Math.random().toString(36).slice(2, 9)}`,
+      recipientPhone: phone,
+      renderedMessage: message,
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
+  function startBulkAddToQueue(items: YouthDueItem[]) {
+    setBulkAddQueue(items);
+  }
+
+  async function pickRecipientForBulk(recipient: Person) {
+    if (bulkAddQueue.length === 0) return;
+    const first = bulkAddQueue[0];
+    await addReachOutToQueue({ kind: 'youth', item: first }, recipient);
+    setBulkAddQueue((prev) => prev.slice(1));
   }
 
   return (
@@ -187,8 +295,9 @@ export function InterviewsToGet() {
                   if (list.length === 0) return null;
                   return (
                     <div key={leader} className="border-t border-border">
-                      <div className="px-4 py-1.5 bg-slate-50 text-muted text-xs font-medium capitalize">
-                        {leader}
+                      <div className="px-4 py-1.5 bg-slate-50 text-muted text-xs font-medium capitalize flex items-center justify-between gap-2">
+                        <span>{leader}</span>
+                        <button type="button" onClick={() => startBulkAddToQueue(list)} className="text-primary text-xs font-semibold min-h-tap py-1 px-2 rounded hover:bg-primary/10">Add all to queue</button>
                       </div>
                       <ul className="list-none p-0 m-0">
                         {list.map((item, i) => (
@@ -198,7 +307,16 @@ export function InterviewsToGet() {
                               <Link to={`/contacts/person/${item.person.id}`} className="flex-1 font-medium min-h-tap no-underline text-inherit">
                                 {item.person.nameListPreferred}
                               </Link>
-                              <span className="text-muted text-sm">{reasonLabel(item)}</span>
+                              <span className="text-muted text-sm shrink-0">{reasonLabel(item)}</span>
+                              <div className="relative shrink-0">
+                                <button type="button" onClick={() => setScheduleMenu(scheduleMenu === `y-${item.person.id}-${item.reason}` ? null : `y-${item.person.id}-${item.reason}`)} className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap" title="Schedule or reach out" aria-label="Schedule or reach out"><Calendar size={18} /></button>
+                                {scheduleMenu === `y-${item.person.id}-${item.reason}` && (
+                                  <div className="absolute right-0 top-full mt-1 py-1 bg-white border border-border rounded-lg shadow-lg z-10 min-w-[140px]">
+                                    <button type="button" onClick={() => openReachOut({ kind: 'youth', item })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Reach out</button>
+                                    <button type="button" onClick={() => scheduleCalendar({ kind: 'youth', item })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Schedule</button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </li>
                         ))}
@@ -216,11 +334,31 @@ export function InterviewsToGet() {
       <Section heading="Advancement (priesthood)">
         <ul className="list-none p-0 m-0 space-y-2">
           {advancement.map((c) => (
-            <li key={`${c.person.id}-${c.office}`} className="card-row flex items-center gap-2 py-2 px-3">
+            <li key={`${c.person.id}-${c.office}`} className="card flex items-center gap-2 py-2 px-3 rounded-xl border border-border">
               <Link to={`/contacts/person/${c.person.id}`} className="flex-1 font-medium min-h-tap no-underline text-inherit">
                 {c.person.nameListPreferred}
               </Link>
-              <span className="text-muted text-sm">{c.office} (turning {c.turningAge})</span>
+              <span className="text-muted text-sm shrink-0">{c.office} (turning {c.turningAge})</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setScheduleMenu(scheduleMenu === `adv-${c.person.id}-${c.office}` ? null : `adv-${c.person.id}-${c.office}`)}
+                    className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap"
+                    title="Schedule or reach out"
+                    aria-label="Schedule or reach out"
+                  >
+                    <Calendar size={18} />
+                  </button>
+                  {scheduleMenu === `adv-${c.person.id}-${c.office}` && (
+                    <div className="absolute right-0 top-full mt-1 py-1 bg-white border border-border rounded-lg shadow-lg z-10 min-w-[140px]">
+                      <button type="button" onClick={() => openReachOut({ kind: 'advancement', candidate: c })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Reach out</button>
+                      <button type="button" onClick={() => scheduleCalendar({ kind: 'advancement', candidate: c })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Schedule</button>
+                    </div>
+                  )}
+                </div>
+                <button type="button" onClick={() => completeAdvancement(c)} className="p-2 rounded-lg text-accent hover:bg-accent/10 min-h-tap" title="Mark complete"><Check size={18} /></button>
+              </div>
             </li>
           ))}
         </ul>
@@ -230,16 +368,79 @@ export function InterviewsToGet() {
       <Section heading="Baptism (8th birthday)">
         <ul className="list-none p-0 m-0 space-y-2">
           {baptism.map((c) => (
-            <li key={c.person.id} className="card-row flex items-center gap-2 py-2 px-3">
+            <li key={c.person.id} className="card flex items-center gap-2 py-2 px-3 rounded-xl border border-border">
               <Link to={`/contacts/person/${c.person.id}`} className="flex-1 font-medium min-h-tap no-underline text-inherit">
                 {c.person.nameListPreferred}
               </Link>
-              <span className="text-muted text-sm">{c.eighthBirthday}</span>
+              <span className="text-muted text-sm shrink-0">{c.eighthBirthday}</span>
+              <div className="flex items-center gap-1 shrink-0">
+                <div className="relative">
+                  <button type="button" onClick={() => setScheduleMenu(scheduleMenu === `bap-${c.person.id}` ? null : `bap-${c.person.id}`)} className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap" title="Schedule or reach out" aria-label="Schedule or reach out"><Calendar size={18} /></button>
+                  {scheduleMenu === `bap-${c.person.id}` && (
+                    <div className="absolute right-0 top-full mt-1 py-1 bg-white border border-border rounded-lg shadow-lg z-10 min-w-[140px]">
+                      <button type="button" onClick={() => openReachOut({ kind: 'baptism', candidate: c })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Reach out</button>
+                      <button type="button" onClick={() => scheduleCalendar({ kind: 'baptism', candidate: c })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Schedule</button>
+                    </div>
+                  )}
+                </div>
+                <button type="button" onClick={() => completeBaptism(c)} className="p-2 rounded-lg text-accent hover:bg-accent/10 min-h-tap" title="Mark complete"><Check size={18} /></button>
+              </div>
             </li>
           ))}
         </ul>
         {baptism.length === 0 && <p className="text-muted text-sm">None.</p>}
       </Section>
+
+      {reachOutTarget && (
+        <RecipientPickerModal
+          person={reachOutTarget.kind === 'advancement' ? reachOutTarget.candidate.person : reachOutTarget.kind === 'baptism' ? reachOutTarget.candidate.person : reachOutTarget.item.person}
+          onSelect={(p) => pickRecipientForReachOut(p)}
+          onClose={() => setReachOutTarget(null)}
+        />
+      )}
+      {bulkAddQueue.length > 0 && (
+        <RecipientPickerModal
+          person={bulkAddQueue[0].person}
+          onSelect={(p) => pickRecipientForBulk(p)}
+          onClose={() => setBulkAddQueue([])}
+          title={`Who should get the text? (${bulkAddQueue.length} left)`}
+        />
+      )}
     </PageLayout>
+  );
+}
+
+function RecipientPickerModal({
+  person,
+  onSelect,
+  onClose,
+  title,
+}: { person: Person; onSelect: (p: Person) => void; onClose: () => void; title?: string }) {
+  const [members, setMembers] = useState<Person[]>([]);
+  useEffect(() => {
+    getHouseholdMembersWithPhones(person).then(setMembers);
+  }, [person]);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl max-w-sm w-full max-h-[70vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="p-4 border-b border-border">
+          <h3 className="font-semibold text-lg m-0">{title ?? 'Who should get the text?'}</h3>
+          <p className="text-muted text-sm mt-1">Household members with a phone number. Selecting adds one message to the queue.</p>
+        </div>
+        <ul className="list-none p-0 m-0 overflow-y-auto flex-1">
+          {members.map((p) => (
+            <li key={p.id}>
+              <button type="button" onClick={() => onSelect(p)} className="card-row w-full text-left">
+                <span className="font-medium">{p.nameListPreferred}</span>
+                {p.phones?.[0] && <span className="text-muted text-sm">{p.phones[0]}</span>}
+              </button>
+            </li>
+          ))}
+        </ul>
+        <div className="p-4 border-t border-border">
+          <button type="button" onClick={onClose} className="w-full border border-border py-2.5 rounded-xl font-medium">Cancel</button>
+        </div>
+      </div>
+    </div>
   );
 }

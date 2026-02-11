@@ -21,10 +21,13 @@ import {
   ChevronUp,
 } from 'lucide-react';
 
+interface CustomItem { id: string; label: string; personId?: string }
+
 export function Dashboard() {
   const [dueNow, setDueNow] = useState({ confirmations: 0, queue: 0 });
   const [monthInterviews, setMonthInterviews] = useState<MonthInterviewRow[]>([]);
   const [upcomingSundayCount, setUpcomingSundayCount] = useState(0);
+  const [customInterviews, setCustomInterviews] = useState<CustomItem[]>([]);
   const [otherExpanded, setOtherExpanded] = useState(false);
 
   const upcomingSun = upcomingSunday(todayLocalDate());
@@ -35,6 +38,13 @@ export function Dashboard() {
 
   useEffect(() => {
     getMonthInterviews().then(setMonthInterviews);
+  }, []);
+
+  useEffect(() => {
+    db.customInterviewToGet
+      .toArray()
+      .then((list) => list.filter((c) => !c.completedAt))
+      .then((list) => setCustomInterviews(list.map((c) => ({ id: c.id, label: c.label, personId: c.personId }))));
   }, []);
 
   useEffect(() => {
@@ -57,13 +67,13 @@ export function Dashboard() {
 
   return (
     <div className="max-w-[640px] mx-auto pb-6">
-      <p className="text-muted text-sm mb-5 mt-0">All data stays on this device unless you export it.</p>
+      <p className="text-muted text-sm mb-5 mt-0 pt-4">All data stays on this device unless you export it.</p>
 
       <section className="mb-6">
         <div className="flex flex-col gap-3">
           <Link
             to="/schedule"
-            className="schedule-cta card flex items-center gap-4 p-4 no-underline text-inherit hover:shadow-md active:scale-[0.99] transition-all text-white border-primary"
+            className="schedule-cta card flex items-center gap-4 p-4 no-underline text-inherit hover:shadow-md active:scale-[0.99] transition-all text-white border-primary border-l-4 border-l-accent"
           >
             <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
               <CalendarPlus size={26} />
@@ -77,11 +87,12 @@ export function Dashboard() {
 
           <Link
             to="/messages"
-            className="card flex items-center justify-between gap-4 p-4 no-underline text-inherit hover:shadow-md active:scale-[0.99] transition-all"
+            className="card flex items-center justify-between gap-4 p-4 no-underline text-inherit hover:shadow-md active:scale-[0.99] transition-all border-l-4 border-l-transparent"
+            style={dueTotal > 0 ? { borderLeftColor: 'var(--color-accent)' } : undefined}
           >
             <div className="flex items-center gap-4 min-w-0">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <MessageCircle size={24} className="text-primary" />
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${dueTotal > 0 ? 'bg-accent/15' : 'bg-primary/10'}`}>
+                <MessageCircle size={24} className={dueTotal > 0 ? 'text-accent' : 'text-primary'} />
               </div>
               <div>
                 <span className="font-semibold block">Message queue</span>
@@ -111,6 +122,36 @@ export function Dashboard() {
           </Link>
         </div>
       </section>
+
+      {customInterviews.length > 0 && (
+        <section className="mb-6">
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h3 className="text-sm font-semibold text-muted uppercase tracking-wide m-0">My interviews to get</h3>
+            <Link to="/interviews-to-get" className="text-primary font-medium text-sm min-h-tap">View all</Link>
+          </div>
+          <div className="card">
+            <ul className="list-none p-0 m-0">
+              {customInterviews.slice(0, 5).map((c) => (
+                <li key={c.id}>
+                  <Link
+                    to={c.personId ? `/contacts/person/${c.personId}` : '/interviews-to-get'}
+                    className="card-row flex items-center gap-3 no-underline text-inherit"
+                  >
+                    <span className="flex-1 min-w-0 font-medium truncate">{c.label}</span>
+                    <ChevronRight size={18} className="text-muted shrink-0" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            {customInterviews.length > 5 && (
+              <Link to="/interviews-to-get" className="card-row flex items-center gap-3 no-underline text-inherit text-muted text-sm">
+                <span className="flex-1">+{customInterviews.length - 5} more</span>
+                <ChevronRight size={18} className="shrink-0" />
+              </Link>
+            )}
+          </div>
+        </section>
+      )}
 
       <section className="mb-6">
         <h3 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">This month&apos;s interviews</h3>

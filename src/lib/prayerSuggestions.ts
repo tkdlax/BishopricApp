@@ -45,15 +45,19 @@ export async function getSuggestedPeopleForPrayer(
   ]);
 
   const skippedPersonIds = new Set(skippedForSunday.map((s) => s.personId));
+  const thisYear = new Date().getFullYear();
 
-  const eligible = allPeople.filter(
-    (p) =>
-      !p.inactive &&
-      !p.doNotAskForPrayer &&
-      p.eligibleForPrayer &&
-      !skippedPersonIds.has(p.id) &&
-      (roleFilter === 'all' || p.role === roleFilter)
-  );
+  const eligible = allPeople.filter((p) => {
+    if (p.inactive || p.doNotAskForPrayer || !p.eligibleForPrayer || skippedPersonIds.has(p.id)) return false;
+    if (roleFilter !== 'all' && p.role !== roleFilter) return false;
+    // Only 12 or older (turning 12 this year or older)
+    if (p.birthDate && p.birthDate.length >= 10) {
+      const birthYear = parseInt(p.birthDate.slice(0, 4), 10);
+      const age = thisYear - birthYear;
+      if (age < 12) return false;
+    } else if (p.age != null && p.age < 12) return false;
+    return true;
+  });
 
   const lastByPerson = new Map<string, string>();
   for (const r of historyRecords) {
@@ -84,7 +88,13 @@ export async function getSuggestedPeopleForPrayer(
     return dateA.localeCompare(dateB);
   });
 
-  return withLast.slice(0, limit);
+  // Shuffle so opening and closing get different order (semantically still "haven't said recently" but randomized)
+  const shuffled = [...withLast];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
+  }
+  return shuffled.slice(0, limit);
 }
 
 /** Record that this person was skipped for this Sunday so they are not re-suggested. */

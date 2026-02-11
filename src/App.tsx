@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Link, useLocation } from 'react-router-dom';
+import { Settings as SettingsIcon } from 'lucide-react';
 import { db } from './db/schema';
 import { getNavItemsByIds, getAllNavPaths, DEFAULT_NAV_ORDER, NAV_SETTINGS_KEY } from './lib/navConfig';
 import { Dashboard } from './pages/Dashboard';
@@ -75,7 +76,7 @@ function AppShell() {
     <div className="min-h-full flex flex-col bg-slate-50">
       <header className="app-header">
         <h1 className="m-0 text-xl font-semibold tracking-tight">Bishopric App</h1>
-        <button type="button" onClick={() => setShowQueue(true)} className="text-white/90 font-medium text-sm min-h-tap py-2 px-3 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors">Queue</button>
+        <Link to="/settings" className="text-white/90 font-medium text-sm min-h-tap py-2 px-3 rounded-lg hover:bg-white/10 active:bg-white/20 transition-colors flex items-center gap-1" aria-label="Settings"><SettingsIcon size={20} /></Link>
       </header>
       <main className="main-below-header flex-1 overflow-auto p-4 pb-24">
         <Routes>

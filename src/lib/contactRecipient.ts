@@ -43,3 +43,9 @@ export async function getMessageRecipientPhone(person: Person): Promise<string |
 
   return person.phones?.[0] ?? null;
 }
+
+/** All household members that have at least one phone number (for "who should get the text?" picker). */
+export async function getHouseholdMembersWithPhones(person: Person): Promise<Person[]> {
+  const members = await db.people.where('householdId').equals(person.householdId).toArray();
+  return members.filter((p) => p.phones?.length && p.phones[0]);
+}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../db/schema';
 import { PageLayout, Section } from '../components/ui';
-import { INTERVIEW_TEMPLATE_TYPES } from '../lib/templates';
+import { INTERVIEW_TEMPLATE_TYPES, PRAYER_ASK_DEFAULT, YOUTH_REACH_OUT_DEFAULT } from '../lib/templates';
 
 const TOKENS = [
   { key: '{name}', label: 'Name' },
@@ -9,6 +9,23 @@ const TOKENS = [
   { key: '{time}', label: 'Time' },
   { key: '{interviewType}', label: 'Interview type' },
   { key: '{locationSuffix}', label: 'Location suffix' },
+];
+
+const PRAYER_TOKENS = [
+  { key: '{name}', label: 'Name' },
+  { key: '{prayerType}', label: 'Prayer (opening/closing)' },
+  { key: '{date}', label: 'Date' },
+];
+
+const YOUTH_REACH_TOKENS = [
+  { key: '{recipient}', label: 'Recipient' },
+  { key: '{bishopPhrase}', label: 'Bishop phrase' },
+  { key: '{interviewType}', label: 'Interview type' },
+];
+
+const EXTRA_TEMPLATES = [
+  { type: 'prayer_ask', name: 'Prayer ask', defaultBody: PRAYER_ASK_DEFAULT, tokens: PRAYER_TOKENS },
+  { type: 'youth_reach_out', name: 'Youth reach out (schedule)', defaultBody: YOUTH_REACH_OUT_DEFAULT, tokens: YOUTH_REACH_TOKENS },
 ];
 
 export function TemplateEditor() {
@@ -23,6 +40,10 @@ export function TemplateEditor() {
       INTERVIEW_TEMPLATE_TYPES.forEach((t) => {
         const found = list.find((x) => x.type === t.type);
         byType[t.type] = found?.body ?? `Hi {name}, your appointment is on {date} at {time}.`;
+      });
+      EXTRA_TEMPLATES.forEach((t) => {
+        const found = list.find((x) => x.type === t.type);
+        byType[t.type] = found?.body ?? t.defaultBody;
       });
       setTemplates(byType);
     })();
@@ -48,12 +69,13 @@ export function TemplateEditor() {
     const body = templates[type] ?? '';
     const existing = await db.templates.where('type').equals(type).first();
     const id = existing?.id ?? `template-${type}`;
+    const displayName = INTERVIEW_TEMPLATE_TYPES.find((t) => t.type === type)?.name ?? EXTRA_TEMPLATES.find((t) => t.type === type)?.name ?? type;
     if (existing) {
       await db.templates.update(id, { body, updatedAt: now });
     } else {
       await db.templates.put({
         id,
-        name: INTERVIEW_TEMPLATE_TYPES.find((t) => t.type === type)?.name ?? type,
+        name: displayName,
         body,
         type,
         createdAt: now,
@@ -72,32 +94,25 @@ export function TemplateEditor() {
             <p className="text-xs text-muted mb-2">Insert token:</p>
             <div className="flex flex-wrap gap-2 mb-3">
               {TOKENS.map((tok) => (
-                <button
-                  key={tok.key}
-                  type="button"
-                  onClick={() => insertToken(t.type, tok.key)}
-                  className="px-2 py-1 rounded-lg border border-border bg-white text-sm font-mono hover:bg-slate-50 min-h-tap"
-                >
-                  {tok.label}
-                </button>
+                <button key={tok.key} type="button" onClick={() => insertToken(t.type, tok.key)} className="px-2 py-1 rounded-lg border border-border bg-white text-sm font-mono hover:bg-slate-50 min-h-tap">{tok.label}</button>
               ))}
             </div>
-            <textarea
-              ref={(el) => { textareaRefs.current[t.type] = el; }}
-              value={templates[t.type] ?? ''}
-              onChange={(e) => setTemplates((prev) => ({ ...prev, [t.type]: e.target.value }))}
-              rows={4}
-              className="border border-border rounded-xl p-3 w-full text-sm font-sans resize-y focus:outline-none focus:ring-2 focus:ring-primary/20"
-              placeholder="Message body..."
-            />
-            <button
-              type="button"
-              onClick={() => save(t.type)}
-              disabled={saving === t.type}
-              className="mt-3 bg-primary text-white px-4 py-2 rounded-xl font-semibold min-h-tap disabled:opacity-50"
-            >
-              {saving === t.type ? 'Saving…' : 'Save'}
-            </button>
+            <textarea ref={(el) => { textareaRefs.current[t.type] = el; }} value={templates[t.type] ?? ''} onChange={(e) => setTemplates((prev) => ({ ...prev, [t.type]: e.target.value }))} rows={4} className="border border-border rounded-xl p-3 w-full text-sm font-sans resize-y focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="Message body..." />
+            <button type="button" onClick={() => save(t.type)} disabled={saving === t.type} className="mt-3 bg-primary text-white px-4 py-2 rounded-xl font-semibold min-h-tap disabled:opacity-50">{saving === t.type ? 'Saving…' : 'Save'}</button>
+          </div>
+        </Section>
+      ))}
+      {EXTRA_TEMPLATES.map((t) => (
+        <Section key={t.type} heading={t.name}>
+          <div className="card p-4">
+            <p className="text-xs text-muted mb-2">Insert token:</p>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {t.tokens.map((tok) => (
+                <button key={tok.key} type="button" onClick={() => insertToken(t.type, tok.key)} className="px-2 py-1 rounded-lg border border-border bg-white text-sm font-mono hover:bg-slate-50 min-h-tap">{tok.label}</button>
+              ))}
+            </div>
+            <textarea ref={(el) => { textareaRefs.current[t.type] = el; }} value={templates[t.type] ?? ''} onChange={(e) => setTemplates((prev) => ({ ...prev, [t.type]: e.target.value }))} rows={4} className="border border-border rounded-xl p-3 w-full text-sm font-sans resize-y focus:outline-none focus:ring-2 focus:ring-primary/20" placeholder="Message body..." />
+            <button type="button" onClick={() => save(t.type)} disabled={saving === t.type} className="mt-3 bg-primary text-white px-4 py-2 rounded-xl font-semibold min-h-tap disabled:opacity-50">{saving === t.type ? 'Saving…' : 'Save'}</button>
           </div>
         </Section>
       ))}

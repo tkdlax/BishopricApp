@@ -42,7 +42,8 @@ export function BackupRestore() {
       const tables = [
         'households', 'people', 'appointments', 'prayerAssignments', 'messageQueue',
         'templates', 'settings', 'blackoutDates', 'dayBlocks', 'interviewToGetDismissals',
-        'interviewToGetNotes', 'customInterviewToGet', 'prayerHistory', 'prayerSkipped',
+        'interviewToGetNotes', 'customInterviewToGet', 'advancementCompletions', 'baptismCompletions',
+        'prayerHistory', 'prayerSkipped',
       ] as const;
       const payload: Record<string, unknown[]> = {};
       for (const table of tables) {

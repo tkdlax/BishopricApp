@@ -10,9 +10,14 @@ export interface InterviewTypeOption {
 
 /** Same interview types used for scheduling/confirmation elsewhere. Display name used in the reach-out sentence. */
 export const REACH_OUT_INTERVIEW_TYPES: InterviewTypeOption[] = [
-  { type: 'standard_interview', name: 'a bishop interview' },
-  { type: 'youth_interview', name: 'a youth interview' },
-  { type: 'tithing_declaration', name: 'tithing declaration' },
+  { type: 'temple_recommend', name: 'Temple Recommend' },
+  { type: 'youth_annual', name: 'Youth Annual' },
+  { type: 'youth_semi_annual', name: 'Youth Semi Annual' },
+  { type: 'ordinance', name: 'Ordinance (baptism/priesthood)' },
+  { type: 'mission_prep', name: 'Mission Prep' },
+  { type: 'ecclesiastical_endorsement', name: 'Ecclesiastical Endorsement' },
+  { type: 'patriarchal_blessing', name: 'Patriarchal Blessing' },
+  { type: 'tithing_declaration', name: 'Tithing Declaration' },
 ];
 
 const REACH_OUT_SENTENCE =

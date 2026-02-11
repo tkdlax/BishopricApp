@@ -16,6 +16,7 @@
   --radius: 8px;
   --min-tap: 44px;
   --color-primary: #1a365d;
+  --color-accent: #059669;
   --color-muted: #64748b;
   --color-border: #e2e8f0;
 }
@@ -260,6 +261,24 @@ button:disabled {
 .schedule-cta {
   background-color: var(--color-primary) !important;
 }
+
+/* Green accent – use sparingly for success/confirm/complete states */
+.bg-accent { background-color: var(--color-accent); }
+.text-accent { color: var(--color-accent); }
+.border-accent { border-color: var(--color-accent); }
+.btn-accent {
+  background-color: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  min-height: var(--min-tap);
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+.btn-accent:hover { background-color: #047857; }
+.btn-accent:active { opacity: 0.9; }
+.btn-accent:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* Contacts list: prevent scroll flash (e.g. from sticky headers) */
 .contacts-list-scroll {

@@ -15,9 +15,10 @@ import type { Person } from '../db/schema';
 import { getRenderedTemplate } from '../lib/templates';
 import { getMessageRecipientPhone } from '../lib/contactRecipient';
 import { getLocationSuffix } from '../lib/templates';
+import { REACH_OUT_INTERVIEW_TYPES } from '../lib/reachOutTemplate';
 
 const DURATION = 20;
-const INTERVIEW_KIND = 'standard_interview';
+const INTERVIEW_KIND = REACH_OUT_INTERVIEW_TYPES[0]?.type ?? 'temple_recommend';
 const DAY_START = 8 * 60;
 const DAY_END = 18 * 60;
 const TOTAL_MINUTES = DAY_END - DAY_START;
@@ -106,11 +107,12 @@ export function DayView() {
         const dateLabel = slotPicker.localDate.replace(/-/g, '/');
         const timeLabel = formatTimeAmPm(slotPicker.minutesFromMidnight);
         const locationSuffix = getLocationSuffix();
+        const typeName = REACH_OUT_INTERVIEW_TYPES.find((t) => t.type === INTERVIEW_KIND)?.name ?? 'Interview';
         const body = await getRenderedTemplate(INTERVIEW_KIND, {
           name: person.nameListPreferred,
           date: dateLabel,
           time: timeLabel,
-          interviewType: 'Bishop interview',
+          interviewType: typeName,
           locationSuffix,
         });
         await db.messageQueue.add({
