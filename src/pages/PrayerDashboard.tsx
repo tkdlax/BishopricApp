@@ -103,7 +103,7 @@ export function PrayerDashboard() {
           <Link to={`/contacts/person/${s.person.id}`} className="flex-1 font-medium min-h-tap no-underline text-inherit">
             {s.person.nameListPreferred}
           </Link>
-          <span className="text-muted text-xs">{s.lastPrayerDate ?? 'Never'}</span>
+          <span className="text-muted text-xs">{s.lastPrayerDate ?? '—'}</span>
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
