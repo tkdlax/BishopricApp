@@ -4,11 +4,20 @@
 
 import { db } from '../db/schema';
 
-/** Format minutes-from-midnight as HH:MM. */
+/** Format minutes-from-midnight as HH:MM (24h). For internal use / time inputs. */
 export function minutesToTime(minutes: number): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/** Format minutes-from-midnight as AM/PM (e.g. "2:30 PM"). For display. */
+export function formatTimeAmPm(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const h12 = h % 12 || 12;
+  const ampm = h < 12 ? 'AM' : 'PM';
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
 export function todayLocalDate(): string {

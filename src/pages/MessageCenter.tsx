@@ -39,7 +39,7 @@ export function MessageCenter() {
   }
 
   return (
-    <PageLayout back={{ to: '/', label: 'Dashboard' }} title="Message Center">
+    <PageLayout back="auto" title="Message Center">
       <Section heading="Pending messages">
         <p className="text-sm text-muted mb-3">Edit any message below before sending. Use the queue runner to open Messages and send.</p>
         {pending.length === 0 ? (

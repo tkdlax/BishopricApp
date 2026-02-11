@@ -71,7 +71,7 @@ export function ContactsManager() {
   const letters = useMemo(() => Object.keys(peopleByLetter).sort((a, b) => (a === '#' ? 1 : b === '#' ? -1 : a.localeCompare(b))), [peopleByLetter]);
 
   return (
-    <PageLayout back={{ to: '/', label: 'Dashboard' }} title="Contacts">
+    <PageLayout back="auto" title="Contacts">
       <div className="mb-4">
         <div className="relative">
           <Search size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none" />
@@ -143,33 +143,50 @@ export function ContactsManager() {
           {letters.length === 0 ? (
             <div className="card p-6 text-center text-muted text-sm">No people found.</div>
           ) : (
-            <div className="card">
-              {letters.map((letter) => (
-                <div key={letter}>
-                  <div className="px-4 py-2 bg-slate-50 text-muted text-xs font-bold uppercase tracking-wider sticky top-0 z-10">
-                    {letter}
+            <div className="relative">
+              <div className="card contacts-list-scroll pr-10">
+                {letters.map((letter) => (
+                  <div key={letter} id={`letter-${letter}`}>
+                    <div className="px-4 py-2 bg-slate-50 text-muted text-xs font-bold uppercase tracking-wider sticky top-0 z-10">
+                      {letter}
+                    </div>
+                    <ul className="list-none p-0 m-0">
+                      {peopleByLetter[letter].map((p) => (
+                        <li key={p.id}>
+                          <Link
+                            to={`/contacts/person/${p.id}`}
+                            className="card-row flex items-center gap-3 no-underline text-inherit"
+                          >
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                              <User size={20} className="text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <span className="font-medium block truncate">{p.name}</span>
+                              <span className="text-muted text-sm truncate block">{p.householdName}</span>
+                            </div>
+                            <ChevronRight size={18} className="text-muted shrink-0" />
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul className="list-none p-0 m-0">
-                    {peopleByLetter[letter].map((p) => (
-                      <li key={p.id}>
-                        <Link
-                          to={`/contacts/person/${p.id}`}
-                          className="card-row flex items-center gap-3 no-underline text-inherit"
-                        >
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                            <User size={20} className="text-primary" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <span className="font-medium block truncate">{p.name}</span>
-                            <span className="text-muted text-sm truncate block">{p.householdName}</span>
-                          </div>
-                          <ChevronRight size={18} className="text-muted shrink-0" />
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+                ))}
+              </div>
+              <div
+                className="absolute right-1 top-1/2 -translate-y-1/2 flex flex-col gap-0 py-1 z-20 pointer-events-auto"
+                aria-label="Jump to letter"
+              >
+                {letters.map((letter) => (
+                  <button
+                    key={letter}
+                    type="button"
+                    onClick={() => document.getElementById(`letter-${letter}`)?.scrollIntoView({ block: 'start', behavior: 'smooth' })}
+                    className="text-[10px] font-bold text-primary min-h-tap min-w-[20px] flex items-center justify-center rounded hover:bg-primary/10 active:bg-primary/20"
+                  >
+                    {letter}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
           <p className="text-muted text-sm mt-4">Add people from a household (open household → Add member).</p>

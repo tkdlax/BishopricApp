@@ -4,7 +4,7 @@
 
 import { db } from '../db/schema';
 import { getMonthRange } from './scheduling';
-import { minutesToTime } from './scheduling';
+import { minutesToTime, formatTimeAmPm } from './scheduling';
 
 export interface MonthInterviewRow {
   appointmentId: string;
@@ -46,4 +46,4 @@ export function formatSundayLabel(localDate: string): string {
   return sun;
 }
 
-export { minutesToTime };
+export { minutesToTime, formatTimeAmPm };

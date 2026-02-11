@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { db } from '../db/schema';
 import { seedDefaultScheduleTemplate } from '../lib/scheduleSeed';
-import { minutesToTime } from '../lib/scheduling';
+import { formatTimeAmPm, todayLocalDate } from '../lib/scheduling';
 import { PeoplePickerModal } from '../components/PeoplePickerModal';
 import { PageLayout, Section, ListRow, Dialog, DialogContent, DialogTitle } from '../components/ui';
 import { ClipboardList, ChevronRight } from 'lucide-react';
@@ -43,7 +43,7 @@ export function ScheduleTemplates() {
   }
 
   return (
-    <PageLayout back={{ to: '/', label: 'Dashboard' }} title="Schedule templates">
+    <PageLayout back="auto" title="Schedule templates">
       <Section heading="Templates">
         <p className="text-sm text-muted mb-4">Recurring Sunday meeting schedules. Edit items, set reminders, or remove an item from a specific day.</p>
         <ul className="flex flex-col gap-2 list-none p-0 m-0">
@@ -117,7 +117,7 @@ export function ScheduleTemplateDetail() {
 
   if (!template) {
     return (
-      <PageLayout back={{ to: '/schedules', label: 'Schedules' }} title="Schedule template">
+      <PageLayout back="auto" title="Schedule template">
         <p className="text-muted">Loading…</p>
       </PageLayout>
     );
@@ -131,7 +131,7 @@ export function ScheduleTemplateDetail() {
   }, {});
 
   return (
-    <PageLayout back={{ to: '/schedules', label: 'Schedules' }} title={template.name}>
+    <PageLayout back="auto" title={template.name}>
       {template.description && <p className="text-sm text-muted mb-4">{template.description}</p>}
 
       <Section heading="Recurring items">
@@ -149,7 +149,7 @@ export function ScheduleTemplateDetail() {
                       className="flex flex-wrap items-center gap-2 py-2 px-3 rounded-lg border border-border bg-slate-50/50"
                     >
                       <span className="font-mono text-sm text-muted shrink-0">
-                        {minutesToTime(item.startMinutes)}–{minutesToTime(item.endMinutes)}
+                        {formatTimeAmPm(item.startMinutes)}–{formatTimeAmPm(item.endMinutes)}
                       </span>
                       <span className="font-medium">{item.label}</span>
                       {item.reminderDaysBefore != null && item.reminderDaysBefore > 0 && (
@@ -190,7 +190,7 @@ export function ScheduleTemplateDetail() {
         <p className="text-sm text-muted mb-2">Remove an item from a specific Sunday.</p>
         <div className={cardClass}>
           <ul className="space-y-2 list-none p-0 m-0 mb-4">
-            {exceptions.map((ex) => {
+            {exceptions.filter((ex) => ex.localDate >= todayLocalDate()).map((ex) => {
               const item = items.find((i) => i.id === ex.itemId);
               return (
                 <li key={ex.id} className="flex items-center justify-between gap-2 py-2 px-3 rounded-lg border border-border bg-slate-50/50">
@@ -281,7 +281,7 @@ function AddItemForm({
           <label className={labelClass}>Start</label>
           <select className={inputClass} value={startMinutes} onChange={(e) => setStartMinutes(Number(e.target.value))}>
             {timeOptions.map((m) => (
-              <option key={m} value={m}>{minutesToTime(m)}</option>
+              <option key={m} value={m}>{formatTimeAmPm(m)}</option>
             ))}
           </select>
         </div>
@@ -289,7 +289,7 @@ function AddItemForm({
           <label className={labelClass}>End</label>
           <select className={inputClass} value={endMinutes} onChange={(e) => setEndMinutes(Number(e.target.value))}>
             {timeOptions.map((m) => (
-              <option key={m} value={m}>{minutesToTime(m)}</option>
+              <option key={m} value={m}>{formatTimeAmPm(m)}</option>
             ))}
           </select>
         </div>
@@ -383,7 +383,7 @@ function EditItemModal({
             <label className={labelClass}>Start</label>
             <select className={inputClass} value={startMinutes} onChange={(e) => setStartMinutes(Number(e.target.value))}>
               {timeOptions.map((m) => (
-                <option key={m} value={m}>{minutesToTime(m)}</option>
+                <option key={m} value={m}>{formatTimeAmPm(m)}</option>
               ))}
             </select>
           </div>
@@ -391,7 +391,7 @@ function EditItemModal({
             <label className={labelClass}>End</label>
             <select className={inputClass} value={endMinutes} onChange={(e) => setEndMinutes(Number(e.target.value))}>
               {timeOptions.map((m) => (
-                <option key={m} value={m}>{minutesToTime(m)}</option>
+                <option key={m} value={m}>{formatTimeAmPm(m)}</option>
               ))}
             </select>
           </div>

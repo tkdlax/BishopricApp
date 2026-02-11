@@ -89,14 +89,14 @@ export function HouseholdDetail() {
 
   if (!isNew && id && !household && members.length === 0) {
     return (
-      <PageLayout back={{ to: '/contacts', label: 'Contacts' }} title="Household">
+      <PageLayout back="auto" title="Household">
         <p className="text-muted">Loading…</p>
       </PageLayout>
     );
   }
 
   return (
-    <PageLayout back={{ to: '/contacts', label: 'Contacts' }} title={isNew ? 'New household' : 'Household'}>
+    <PageLayout back="auto" title={isNew ? 'New household' : 'Household'}>
       <Section heading="Name">
         <input
           type="text"

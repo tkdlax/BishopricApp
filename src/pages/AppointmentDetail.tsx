@@ -4,7 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { db } from '../db/schema';
 import { PageLayout, Section } from '../components/ui';
 import {
-  minutesToTime,
+  formatTimeAmPm,
   getNextAvailableSlot,
   getInterviewSlotMinutes,
   addDays,
@@ -66,7 +66,7 @@ export const AppointmentDetail: FC = () => {
     const next = getNextAvailableSlot(from, appts, blackouts, slotMinutes);
     if (!next) return;
     const now = Date.now();
-    const log = [...(appointment.historyLog ?? []), { at: now, who: 'user', what: `Punted to ${next.localDate} ${minutesToTime(next.minutesFromMidnight)}` }];
+    const log = [...(appointment.historyLog ?? []), { at: now, who: 'user', what: `Punted to ${next.localDate} ${formatTimeAmPm(next.minutesFromMidnight)}` }];
     await db.appointments.update(id!, {
       localDate: next.localDate,
       minutesFromMidnight: next.minutesFromMidnight,
@@ -83,7 +83,7 @@ export const AppointmentDetail: FC = () => {
     const interviewKind = appointment.interviewKind ?? 'standard_interview';
     const typeName = REACH_OUT_INTERVIEW_TYPES.find((t) => t.type === interviewKind)?.name ?? 'interview';
     const dateLabel = appointment.localDate.replace(/-/g, '/');
-    const timeLabel = minutesToTime(appointment.minutesFromMidnight);
+    const timeLabel = formatTimeAmPm(appointment.minutesFromMidnight);
     const locationSuffix = getLocationSuffix(appointment.location);
     const body = await getRenderedTemplate(interviewKind, {
       name: person.nameListPreferred,
@@ -115,7 +115,7 @@ export const AppointmentDetail: FC = () => {
 
   if (!appointment) {
     return (
-      <PageLayout back={{ to: '/', label: 'Dashboard' }} title="Appointment">
+      <PageLayout back="auto" title="Appointment">
         <p className="text-muted">Loading…</p>
       </PageLayout>
     );
@@ -124,7 +124,7 @@ export const AppointmentDetail: FC = () => {
   const interviewTypeName = REACH_OUT_INTERVIEW_TYPES.find((t) => t.type === (appointment.interviewKind ?? 'standard_interview'))?.name ?? 'Interview';
 
   return (
-    <PageLayout back={{ to: '/', label: 'Dashboard' }} title="Appointment">
+    <PageLayout back="auto" title="Appointment">
       <Section heading="Person">
         <Link to={`/contacts/person/${appointment.personId}`} className="text-primary font-medium min-h-tap">
           {person?.nameListPreferred ?? '—'} — View person
@@ -132,7 +132,7 @@ export const AppointmentDetail: FC = () => {
       </Section>
       <Section heading="When">
         <p className="font-medium">
-          {appointment.localDate} at {minutesToTime(appointment.minutesFromMidnight)} ({appointment.durationMinutes ?? 20} min)
+          {appointment.localDate} at {formatTimeAmPm(appointment.minutesFromMidnight)} ({appointment.durationMinutes ?? 20} min)
         </p>
       </Section>
       <Section heading="Type">

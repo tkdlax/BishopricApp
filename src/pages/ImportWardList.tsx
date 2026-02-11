@@ -80,7 +80,7 @@ export function ImportWardList() {
   const inputClass = 'border border-border rounded-lg px-3 py-2 w-full';
 
   return (
-    <PageLayout back={{ to: '/contacts', label: 'Contacts' }} title="Import ward list">
+    <PageLayout back="auto" title="Import ward list">
       <p className="text-muted text-sm mb-4">Data is stored locally only. Raw JSON is never saved.</p>
 
       <Section heading="Update from LCR">

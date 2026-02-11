@@ -118,7 +118,7 @@ export function Settings() {
   }
 
   return (
-    <PageLayout back={{ to: '/', label: 'Dashboard' }} title="Settings">
+    <PageLayout back="auto" title="Settings">
       <Section heading="Bishop (for messages)">
         <div className={cardClass}>
           <p className="text-sm text-muted mb-2">Used in reach-out messages: &quot;on behalf of bishop [last name]&quot;.</p>
@@ -131,6 +131,12 @@ export function Settings() {
               <button type="button" onClick={() => setBishop(null)} className="border border-border rounded-lg px-4 py-2.5 min-h-tap">Clear</button>
             )}
           </div>
+        </div>
+      </Section>
+      <Section heading="Message templates">
+        <div className={cardClass}>
+          <p className="text-sm text-muted mb-2">Edit default text for queue messages and insert tokens (e.g. name, date, time). You can also edit any message in the queue before sending.</p>
+          <Link to="/settings/templates" className="text-primary font-semibold min-h-tap inline-block">Edit templates</Link>
         </div>
       </Section>
       <Section heading="Interview slot window">

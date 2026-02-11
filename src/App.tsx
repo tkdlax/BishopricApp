@@ -18,6 +18,7 @@ import { PersonDetail } from './pages/PersonDetail';
 import { InterviewsToGet } from './pages/InterviewsToGet';
 import { PrayerDashboard } from './pages/PrayerDashboard';
 import { BackupRestore } from './pages/BackupRestore';
+import { TemplateEditor } from './pages/TemplateEditor';
 import { QueueRunnerModal } from './components/QueueRunnerModal';
 
 function AppointmentDetailPage() {
@@ -65,7 +66,8 @@ function AppShell() {
   const showNav =
     navPaths.has(location.pathname) ||
     location.pathname.startsWith('/contacts/') ||
-    location.pathname.startsWith('/schedules/');
+    location.pathname.startsWith('/schedules/') ||
+    location.pathname.startsWith('/settings/');
 
   const navItems = useMemo(() => getNavItemsByIds(navOrder), [navOrder]);
 
@@ -81,6 +83,7 @@ function AppShell() {
           <Route path="/schedule" element={<ScheduleInterview />} />
           <Route path="/messages" element={<MessageCenter />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/settings/templates" element={<TemplateEditor />} />
           <Route path="/hallway" element={<HallwayMode />} />
           <Route path="/schedules" element={<ScheduleTemplates />} />
           <Route path="/schedules/:id" element={<ScheduleTemplateDetail />} />

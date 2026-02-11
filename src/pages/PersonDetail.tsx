@@ -67,14 +67,14 @@ export function PersonDetail() {
 
   if (!person) {
     return (
-      <PageLayout back={{ to: '/contacts', label: 'Contacts' }} title="Person">
+      <PageLayout back="auto" title="Person">
         <p className="text-muted">Loading…</p>
       </PageLayout>
     );
   }
 
   return (
-    <PageLayout back={{ to: '/contacts', label: 'Contacts' }} title="Person">
+    <PageLayout back="auto" title="Person">
       <Section heading="Preferred name (list)">
         <input
           type="text"

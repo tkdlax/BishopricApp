@@ -7,7 +7,7 @@ import {
   upcomingSunday,
   todayLocalDate,
   nextSunday,
-  minutesToTime,
+  formatTimeAmPm,
 } from '../lib/scheduling';
 import { getBlackoutDates } from '../lib/blackouts';
 import { formatSundayLabel } from '../lib/monthInterviews';
@@ -82,7 +82,7 @@ export function HallwayMode() {
       const phone = await getMessageRecipientPhone(person);
       if (phone) {
         const dateLabel = slotPicker.localDate.replace(/-/g, '/');
-        const timeLabel = minutesToTime(slotPicker.minutesFromMidnight);
+        const timeLabel = formatTimeAmPm(slotPicker.minutesFromMidnight);
         const locationSuffix = getLocationSuffix(location);
         const body = await getRenderedTemplate(interviewKind, {
           name: person.nameListPreferred,
@@ -131,7 +131,7 @@ export function HallwayMode() {
   );
 
   return (
-    <PageLayout back={{ to: '/', label: 'Dashboard' }} title="Hallway mode">
+    <PageLayout back="auto" title="Hallway mode">
       <div className="card p-4 mb-5">
         <h3 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">Duration</h3>
         <div className="flex flex-wrap gap-2 items-center">

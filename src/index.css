@@ -255,3 +255,16 @@ button:disabled {
 .card-row:active {
   background: #f1f5f9;
 }
+
+/* Schedule CTA on dashboard: always dark so text is readable */
+.schedule-cta {
+  background-color: var(--color-primary) !important;
+}
+
+/* Contacts list: prevent scroll flash (e.g. from sticky headers) */
+.contacts-list-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  contain: layout style;
+  transform: translateZ(0);
+}

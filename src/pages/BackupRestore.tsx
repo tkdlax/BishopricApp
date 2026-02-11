@@ -93,7 +93,7 @@ export function BackupRestore() {
   };
 
   return (
-    <PageLayout back={{ to: '/', label: 'Dashboard' }} title="Backup and restore">
+    <PageLayout back="auto" title="Backup and restore">
       <Section heading="Export backup">
         <p className="text-muted text-sm mb-2">Encrypted backup stays on this device. Use a password you will remember for restore.</p>
         <input

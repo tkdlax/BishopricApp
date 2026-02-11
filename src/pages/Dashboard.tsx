@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../db/schema';
 import { getDueNowCounts } from '../lib/dueRules';
-import { getMonthInterviews, formatSundayLabel, minutesToTime, type MonthInterviewRow } from '../lib/monthInterviews';
+import { getMonthInterviews, formatSundayLabel, formatTimeAmPm, type MonthInterviewRow } from '../lib/monthInterviews';
 import { upcomingSunday, todayLocalDate } from '../lib/scheduling';
 import {
   CalendarPlus,
@@ -63,7 +63,7 @@ export function Dashboard() {
         <div className="flex flex-col gap-3">
           <Link
             to="/schedule"
-            className="card flex items-center gap-4 p-4 no-underline text-inherit hover:shadow-md active:scale-[0.99] transition-all bg-primary text-white border-primary"
+            className="schedule-cta card flex items-center gap-4 p-4 no-underline text-inherit hover:shadow-md active:scale-[0.99] transition-all text-white border-primary"
           >
             <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
               <CalendarPlus size={26} />
@@ -133,7 +133,7 @@ export function Dashboard() {
                       className="card-row flex items-center gap-3 no-underline text-inherit"
                     >
                       <span className="flex-1 min-w-0 font-medium">
-                        {minutesToTime(row.minutesFromMidnight)} – {row.personName}
+                        {formatTimeAmPm(row.minutesFromMidnight)} – {row.personName}
                       </span>
                       <ChevronRight size={18} className="text-muted shrink-0" />
                     </Link>
