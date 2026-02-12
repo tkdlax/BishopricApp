@@ -16,6 +16,7 @@ export const INTERVIEW_LOCATION_OPTIONS = [
 ];
 
 const DEFAULT_BODIES: Record<string, string> = {
+  bishop_interview: 'Hi {name}, you have an {interviewType} scheduled for {date} at {time}.{locationSuffix}',
   temple_recommend: 'Hi {name}, you have a temple recommend interview scheduled for {date} at {time}.{locationSuffix}',
   youth_annual: 'Hi {name}, you have a youth annual interview scheduled for {date} at {time}.{locationSuffix}',
   youth_semi_annual: 'Hi {name}, you have a youth semi-annual interview scheduled for {date} at {time}.{locationSuffix}',

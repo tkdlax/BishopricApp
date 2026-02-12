@@ -15,7 +15,7 @@ import type { Person } from '../db/schema';
 import { getRenderedTemplate } from '../lib/templates';
 import { getMessageRecipientPhone } from '../lib/contactRecipient';
 import { getLocationSuffix } from '../lib/templates';
-import { REACH_OUT_INTERVIEW_TYPES } from '../lib/reachOutTemplate';
+import { REACH_OUT_INTERVIEW_TYPES, getMessageTextForType } from '../lib/reachOutTemplate';
 
 const DURATION = 20;
 const INTERVIEW_KIND = REACH_OUT_INTERVIEW_TYPES[0]?.type ?? 'temple_recommend';
@@ -107,7 +107,7 @@ export function DayView() {
         const dateLabel = slotPicker.localDate.replace(/-/g, '/');
         const timeLabel = formatTimeAmPm(slotPicker.minutesFromMidnight);
         const locationSuffix = getLocationSuffix();
-        const typeName = REACH_OUT_INTERVIEW_TYPES.find((t) => t.type === INTERVIEW_KIND)?.name ?? 'Interview';
+        const typeName = getMessageTextForType(INTERVIEW_KIND);
         const body = await getRenderedTemplate(INTERVIEW_KIND, {
           name: person.nameListPreferred,
           date: dateLabel,

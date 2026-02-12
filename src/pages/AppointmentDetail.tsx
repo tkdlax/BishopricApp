@@ -12,7 +12,7 @@ import { getBlackoutDates } from '../lib/blackouts';
 import { getRenderedTemplate, getLocationSuffix, INTERVIEW_LOCATION_OPTIONS } from '../lib/templates';
 import { getMessageRecipientPhone } from '../lib/contactRecipient';
 import { buildIcsForAppointment, downloadIcs } from '../lib/calendarExport';
-import { REACH_OUT_INTERVIEW_TYPES } from '../lib/reachOutTemplate';
+import { REACH_OUT_INTERVIEW_TYPES, getMessageTextForType } from '../lib/reachOutTemplate';
 import { formatSundayLabel } from '../lib/monthInterviews';
 import type { Appointment, Person } from '../db/schema';
 import { Calendar, MessageCircle, CalendarPlus, MapPin, ChevronDown, User } from 'lucide-react';
@@ -83,7 +83,7 @@ export const AppointmentDetail: FC = () => {
     const phone = await getMessageRecipientPhone(person);
     if (!phone) return;
     const interviewKind = appointment.interviewKind ?? 'standard_interview';
-    const typeName = REACH_OUT_INTERVIEW_TYPES.find((t) => t.type === interviewKind)?.name ?? 'interview';
+    const typeName = getMessageTextForType(interviewKind);
     const dateLabel = appointment.localDate.replace(/-/g, '/');
     const timeLabel = formatTimeAmPm(appointment.minutesFromMidnight);
     const locationSuffix = getLocationSuffix(appointment.location);

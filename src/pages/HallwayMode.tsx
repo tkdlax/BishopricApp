@@ -14,7 +14,7 @@ import { formatSundayLabel } from '../lib/monthInterviews';
 import { PeoplePickerModal } from '../components/PeoplePickerModal';
 import { getRenderedTemplate, getLocationSuffix, INTERVIEW_LOCATION_OPTIONS } from '../lib/templates';
 import { getMessageRecipientPhone } from '../lib/contactRecipient';
-import { REACH_OUT_INTERVIEW_TYPES } from '../lib/reachOutTemplate';
+import { REACH_OUT_INTERVIEW_TYPES, getMessageTextForType } from '../lib/reachOutTemplate';
 import type { Person } from '../db/schema';
 import type { SlotInfo } from '../lib/scheduling';
 
@@ -35,7 +35,7 @@ export function HallwayMode() {
   const [addToQueue, setAddToQueue] = useState(true);
 
   const effectiveDuration = DURATION_OPTIONS.includes(duration) ? duration : (parseInt(customDuration, 10) || DEFAULT_DURATION);
-  const interviewTypeName = REACH_OUT_INTERVIEW_TYPES.find((t) => t.type === interviewKind)?.name ?? 'interview';
+  const interviewTypeName = getMessageTextForType(interviewKind);
 
   useEffect(() => {
     let cancelled = false;

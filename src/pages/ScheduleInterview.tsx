@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { db } from '../db/schema';
 import { getMessageRecipientPhone } from '../lib/contactRecipient';
 import { getBishopLastNameForMessage } from '../lib/bishopForMessages';
-import { buildReachOutMessage, REACH_OUT_INTERVIEW_TYPES } from '../lib/reachOutTemplate';
+import { buildReachOutMessage, REACH_OUT_INTERVIEW_TYPES, getMessageTextForType } from '../lib/reachOutTemplate';
 import { PeoplePickerModal } from '../components/PeoplePickerModal';
 import { PageLayout, Section } from '../components/ui';
 import { MessageCircle, Calendar } from 'lucide-react';
@@ -23,8 +23,7 @@ export function ScheduleInterview() {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const interviewType = REACH_OUT_INTERVIEW_TYPES.find((t) => t.type === selectedTypeKey);
-  const interviewTypeDisplay = interviewType?.name ?? 'an interview';
+  const interviewTypeDisplay = getMessageTextForType(selectedTypeKey);
 
   async function handleAddToQueue() {
     if (!selectedPerson) return;
