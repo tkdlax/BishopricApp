@@ -22,6 +22,7 @@ const INTERVIEW_KIND = REACH_OUT_INTERVIEW_TYPES[0]?.type ?? 'temple_recommend';
 const DAY_START = 8 * 60;
 const DAY_END = 18 * 60;
 const TOTAL_MINUTES = DAY_END - DAY_START;
+const SLOT_HEIGHT = 36; /* px per 30-min row; same value used in Dashboard calendar */
 const DEFAULT_TEMPLATE_ID = 'schedule-monthly-sunday';
 
 type DayEvent =
@@ -219,15 +220,15 @@ export function DayView() {
               </button>
             </div>
           </div>
-          <div className="flex min-h-[320px]">
+          <div className="flex min-h-[400px]">
             <div className="w-[4.5rem] shrink-0 border-r border-slate-100 bg-slate-50/50 py-2 pr-1">
               {timeSlots.map((m) => (
-                <div key={m} className="text-[11px] text-slate-500 font-medium tabular-nums leading-6 h-6" style={{ height: 24 }}>
+                <div key={m} className="text-[11px] text-slate-500 font-medium tabular-nums flex items-center" style={{ height: SLOT_HEIGHT }}>
                   {formatTimeAmPm(m)}
                 </div>
               ))}
             </div>
-            <div className="flex-1 relative bg-slate-50/30" style={{ height: timeSlots.length * 24, minHeight: 320 }}>
+            <div className="flex-1 relative bg-slate-50/30" style={{ height: timeSlots.length * SLOT_HEIGHT, minHeight: 400 }}>
               {/* Hour grid lines */}
               {Array.from({ length: (DAY_END - DAY_START) / 60 + 1 }, (_, i) => (
                 <div
@@ -266,7 +267,7 @@ export function DayView() {
                     style={{
                       top: `${topPct}%`,
                       height: `${Math.max(heightPct, 4)}%`,
-                      minHeight: 26,
+                      minHeight: 32,
                       left: `calc(${leftPct}% + 6px)`,
                       width: `calc(${widthPct}% - ${6 + gap}px)`,
                       backgroundColor: isAppointment ? '#eef2ff' : isBlock ? '#ecfdf5' : '#f8fafc',
