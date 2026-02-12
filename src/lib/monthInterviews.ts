@@ -46,4 +46,11 @@ export function formatSundayLabel(localDate: string): string {
   return sun;
 }
 
+/** Long date for calendar headers, e.g. "Sunday, May 25". */
+export function formatLongDate(localDate: string): string {
+  const [y, m, d] = localDate.split('-').map(Number);
+  const dObj = new Date(y!, (m ?? 1) - 1, d ?? 1);
+  return dObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
 export { minutesToTime, formatTimeAmPm };

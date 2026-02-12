@@ -27,7 +27,7 @@ export function DialogContent({
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
-        className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg p-6 max-h-[90vh] overflow-auto ${className}`}
+        className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl p-6 max-h-[90vh] overflow-auto w-[80vw] max-w-[480px] ${className}`}
         {...props}
       >
         {children}

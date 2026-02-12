@@ -9,7 +9,7 @@ import {
   formatTimeAmPm,
   getWeekOfMonth,
 } from '../lib/scheduling';
-import { formatSundayLabel } from '../lib/monthInterviews';
+import { formatLongDate } from '../lib/monthInterviews';
 import { PeoplePickerModal } from '../components/PeoplePickerModal';
 import type { Person } from '../db/schema';
 import { getRenderedTemplate } from '../lib/templates';
@@ -198,44 +198,41 @@ export function DayView() {
 
   return (
     <PageLayout back="auto" title="Day view" fullWidth>
-      <Section heading="Date">
-        <div className="card p-4">
-          <div className="flex gap-2 flex-wrap">
-            <button
-              type="button"
-              onClick={() => setSelectedDate(defaultDate)}
-              className={`px-4 py-2.5 rounded-xl border min-h-tap font-semibold transition-colors ${isThisSunday ? 'bg-primary text-white border-primary' : 'bg-white border-border hover:bg-slate-50'}`}
-            >
-              This Sunday
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedDate(nextSun)}
-              className={`px-4 py-2.5 rounded-xl border min-h-tap font-semibold transition-colors ${isNextSunday ? 'bg-primary text-white border-primary' : 'bg-white border-border hover:bg-slate-50'}`}
-            >
-              Next Sunday
-            </button>
-          </div>
-          <p className="text-muted text-sm mt-3 font-medium">{formatSundayLabel(selectedDate)}</p>
-        </div>
-      </Section>
-
       <Section heading="">
-        <div className="card overflow-hidden">
-          <div className="flex">
-            <div className="w-16 shrink-0 border-r border-border py-1">
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-md overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
+            <p className="text-lg font-semibold text-slate-800 m-0">{formatLongDate(selectedDate)}</p>
+            <div className="flex gap-2 flex-wrap mt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedDate(defaultDate)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium min-h-tap transition-colors ${isThisSunday ? 'bg-primary text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+              >
+                This Sunday
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedDate(nextSun)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium min-h-tap transition-colors ${isNextSunday ? 'bg-primary text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+              >
+                Next Sunday
+              </button>
+            </div>
+          </div>
+          <div className="flex min-h-[320px]">
+            <div className="w-[4.5rem] shrink-0 border-r border-slate-100 bg-slate-50/50 py-2 pr-1">
               {timeSlots.map((m) => (
-                <div key={m} className="text-[10px] text-muted font-mono leading-6 h-6" style={{ height: 24 }}>
+                <div key={m} className="text-[11px] text-slate-500 font-medium tabular-nums leading-6 h-6" style={{ height: 24 }}>
                   {formatTimeAmPm(m)}
                 </div>
               ))}
             </div>
-            <div className="flex-1 relative bg-slate-50/50" style={{ height: timeSlots.length * 24 }}>
+            <div className="flex-1 relative bg-slate-50/30" style={{ height: timeSlots.length * 24, minHeight: 320 }}>
               {/* Hour grid lines */}
               {Array.from({ length: (DAY_END - DAY_START) / 60 + 1 }, (_, i) => (
                 <div
                   key={i}
-                  className="absolute left-0 right-0 border-t border-slate-200/80"
+                  className="absolute left-0 right-0 border-t border-slate-200/70"
                   style={{ top: `${(i * 60 / TOTAL_MINUTES) * 100}%` }}
                 />
               ))}
@@ -246,7 +243,7 @@ export function DayView() {
                 if (nowMinutes < DAY_START || nowMinutes > DAY_END) return null;
                 return (
                   <div
-                    className="absolute left-0 right-0 z-10 h-0.5 bg-emerald-500"
+                    className="absolute left-0 right-0 z-10 h-0.5 bg-emerald-500 shadow-sm"
                     style={{ top: `${((nowMinutes - DAY_START) / TOTAL_MINUTES) * 100}%` }}
                     aria-hidden
                   />
@@ -259,30 +256,35 @@ export function DayView() {
                 const gap = 2;
                 const widthPct = (100 - (total - 1) * gap) / total;
                 const leftPct = index * (widthPct + gap);
+                const isAppointment = ev.type === 'appointment';
+                const isBlock = ev.type === 'block';
+                const leftBorder = isAppointment ? '#6366f1' : isBlock ? '#10b981' : '#94a3b8';
                 return (
                   <div
                     key={ev.type === 'recurring' ? `r-${ev.id}` : ev.id}
-                    className="absolute rounded-lg border overflow-hidden text-xs font-medium shadow-sm"
+                    className="absolute rounded-lg border border-slate-200/80 overflow-hidden shadow-sm"
                     style={{
                       top: `${topPct}%`,
                       height: `${Math.max(heightPct, 4)}%`,
-                      minHeight: 22,
-                      left: `calc(${leftPct}% + 4px)`,
-                      width: `calc(${widthPct}% - ${4 + gap}px)`,
-                      backgroundColor: ev.type === 'appointment' ? '#e0e7ff' : ev.type === 'block' ? '#d1fae5' : '#f3f4f6',
-                      borderColor: ev.type === 'appointment' ? '#a5b4fc' : ev.type === 'block' ? '#6ee7b7' : '#e5e7eb',
+                      minHeight: 26,
+                      left: `calc(${leftPct}% + 6px)`,
+                      width: `calc(${widthPct}% - ${6 + gap}px)`,
+                      backgroundColor: isAppointment ? '#eef2ff' : isBlock ? '#ecfdf5' : '#f8fafc',
+                      borderColor: isAppointment ? '#c7d2fe' : isBlock ? '#a7f3d0' : '#e2e8f0',
+                      borderLeftWidth: '3px',
+                      borderLeftColor: leftBorder,
                     }}
                   >
                     {ev.type === 'appointment' ? (
                       <Link
                         to={`/appointment/${ev.id}`}
-                        className="block p-1.5 truncate no-underline text-inherit"
+                        className="block p-2 truncate no-underline text-inherit text-[13px] font-medium text-slate-800"
                       >
                         {formatTimeAmPm(ev.start)} – {ev.label}
                       </Link>
                     ) : ev.type === 'recurring' ? (
-                      <div className="p-1.5 flex items-center gap-1 min-h-0">
-                        <span className="truncate flex-1">{formatTimeAmPm(ev.start)} – {ev.label}</span>
+                      <div className="p-2 flex items-center gap-1 min-h-0">
+                        <span className="truncate flex-1 text-[13px] font-medium text-slate-700">{formatTimeAmPm(ev.start)} – {ev.label}</span>
                         <button
                           type="button"
                           onClick={() => dismissRecurring(ev.id)}
@@ -292,7 +294,7 @@ export function DayView() {
                         </button>
                       </div>
                     ) : (
-                      <div className="p-1.5 truncate">
+                      <div className="p-2 truncate text-[13px] font-medium text-slate-700">
                         {formatTimeAmPm(ev.start)} – {ev.label}
                       </div>
                     )}
@@ -343,7 +345,7 @@ export function DayView() {
         <>
           <div className="fixed inset-0 z-10 bg-black/30" aria-hidden />
           <div className="fixed inset-0 z-20 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-xl border border-border p-4 w-full max-w-sm">
+            <div className="bg-white rounded-2xl shadow-xl border border-border p-4 w-[80vw] max-w-[480px]">
               <h3 className="font-bold text-lg mt-0 mb-3">Add event</h3>
               <input
                 type="text"

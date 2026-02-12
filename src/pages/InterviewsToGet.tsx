@@ -489,7 +489,7 @@ function RecipientPickerModal({
   }, [person]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl max-w-sm w-full max-h-[70vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-xl shadow-xl w-[80vw] max-w-[480px] max-h-[70vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="p-4 border-b border-border">
           <h3 className="font-semibold text-lg m-0">{title ?? 'Who should get the text?'}</h3>
           <p className="text-muted text-sm mt-1">Household members with a phone number. Selecting adds one message to the queue.</p>

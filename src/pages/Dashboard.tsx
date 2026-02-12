@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../db/schema';
 import { getDueNowCounts } from '../lib/dueRules';
-import { formatSundayLabel, formatTimeAmPm } from '../lib/monthInterviews';
+import { formatTimeAmPm, formatLongDate } from '../lib/monthInterviews';
 import { upcomingSunday, todayLocalDate, getWeekOfMonth } from '../lib/scheduling';
 import {
   CalendarPlus,
@@ -168,23 +168,23 @@ export function Dashboard() {
           <h3 className="text-sm font-semibold text-muted uppercase tracking-wide m-0">Upcoming interviews</h3>
           <Link to="/day" className="text-primary font-medium text-sm min-h-tap">Full day view</Link>
         </div>
-        <div className="card overflow-hidden">
-          <div className="px-4 py-2 border-b border-border text-muted text-xs font-semibold uppercase tracking-wide">
-            {formatSundayLabel(upcomingSun)}
+        <div className="rounded-2xl border border-slate-200/90 bg-white shadow-md overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/80">
+            <p className="text-base font-semibold text-slate-800 m-0">{formatLongDate(upcomingSun)}</p>
           </div>
-          <div className="flex">
-            <div className="w-14 shrink-0 border-r border-border py-1">
+          <div className="flex min-h-[200px]">
+            <div className="w-[4rem] shrink-0 border-r border-slate-100 bg-slate-50/50 py-1.5 pr-1">
               {timeSlots.map((m) => (
-                <div key={m} className="text-[10px] text-muted font-mono leading-5 h-5" style={{ height: 20 }}>
+                <div key={m} className="text-[10px] text-slate-500 font-medium tabular-nums leading-5 h-5" style={{ height: 20 }}>
                   {formatTimeAmPm(m)}
                 </div>
               ))}
             </div>
-            <div className="flex-1 relative bg-slate-50/50 min-h-[200px]" style={{ height: Math.max(timeSlots.length * 20, 200) }}>
+            <div className="flex-1 relative bg-slate-50/30" style={{ height: Math.max(timeSlots.length * 20, 200) }}>
               {Array.from({ length: (DAY_END - DAY_START) / 60 + 1 }, (_, i) => (
                 <div
                   key={`h-${i}`}
-                  className="absolute left-0 right-0 border-t border-slate-200/80"
+                  className="absolute left-0 right-0 border-t border-slate-200/70"
                   style={{ top: `${(i * 60 / TOTAL_MINUTES) * 100}%` }}
                 />
               ))}
@@ -194,7 +194,7 @@ export function Dashboard() {
                 if (nowMinutes < DAY_START || nowMinutes > DAY_END) return null;
                 return (
                   <div
-                    className="absolute left-0 right-0 z-10 h-0.5 bg-emerald-500"
+                    className="absolute left-0 right-0 z-10 h-0.5 bg-emerald-500 shadow-sm"
                     style={{ top: `${((nowMinutes - DAY_START) / TOTAL_MINUTES) * 100}%` }}
                     aria-hidden
                   />
@@ -207,26 +207,31 @@ export function Dashboard() {
                 const gap = 2;
                 const widthPct = (100 - (total - 1) * gap) / total;
                 const leftPct = index * (widthPct + gap);
+                const isAppointment = ev.type === 'appointment';
+                const isBlock = ev.type === 'block';
+                const leftBorder = isAppointment ? '#6366f1' : isBlock ? '#10b981' : '#94a3b8';
                 return (
                   <div
                     key={ev.type === 'recurring' ? `r-${ev.id}` : ev.id}
-                    className="absolute rounded border overflow-hidden text-xs font-medium shadow-sm"
+                    className="absolute rounded-lg border border-slate-200/80 overflow-hidden shadow-sm"
                     style={{
                       top: `${topPct}%`,
                       height: `${Math.max(heightPct, 3)}%`,
-                      minHeight: 18,
+                      minHeight: 20,
                       left: `calc(${leftPct}% + 4px)`,
                       width: `calc(${widthPct}% - ${4 + gap}px)`,
-                      backgroundColor: ev.type === 'appointment' ? '#e0e7ff' : ev.type === 'block' ? '#d1fae5' : '#f3f4f6',
-                      borderColor: ev.type === 'appointment' ? '#a5b4fc' : ev.type === 'block' ? '#6ee7b7' : '#e5e7eb',
+                      backgroundColor: isAppointment ? '#eef2ff' : isBlock ? '#ecfdf5' : '#f8fafc',
+                      borderColor: isAppointment ? '#c7d2fe' : isBlock ? '#a7f3d0' : '#e2e8f0',
+                      borderLeftWidth: '3px',
+                      borderLeftColor: leftBorder,
                     }}
                   >
                     {ev.type === 'appointment' ? (
-                      <Link to={`/appointment/${ev.id}`} className="block p-1 truncate no-underline text-inherit">
+                      <Link to={`/appointment/${ev.id}`} className="block p-1.5 truncate no-underline text-inherit text-xs font-medium text-slate-800">
                         {formatTimeAmPm(ev.start)} – {ev.label}
                       </Link>
                     ) : (
-                      <div className="p-1 truncate">{formatTimeAmPm(ev.start)} – {ev.label}</div>
+                      <div className="p-1.5 truncate text-xs font-medium text-slate-700">{formatTimeAmPm(ev.start)} – {ev.label}</div>
                     )}
                   </div>
                 );

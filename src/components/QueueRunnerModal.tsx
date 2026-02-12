@@ -95,6 +95,13 @@ export function QueueRunnerModal({ onClose }: { onClose: () => void }) {
     setShowSkipReason(true);
   }
 
+  /** Hold: leave this message in queue (still pending) and move to next. */
+  function handleHold() {
+    if (!current) return;
+    setItems((prev) => prev.filter((i) => i.id !== current.id));
+    if (items.length <= 1) onClose();
+  }
+
   function confirmSkip() {
     if (!current) return;
     const now = Date.now();
@@ -193,6 +200,7 @@ export function QueueRunnerModal({ onClose }: { onClose: () => void }) {
                   <button type="button" onClick={handleOpenMessages} className={btnPrimary}>Open Messages</button>
                   <button type="button" onClick={handleCopy} className={btnSecondary}>Copy message</button>
                   <button type="button" onClick={startEdit} className={btnSecondary}>Edit</button>
+                  <button type="button" onClick={handleHold} className={btnSecondary} title="Leave in queue and go to next">Hold</button>
                   <button type="button" onClick={handleSkip} className={btnSecondary}>Skip</button>
                 </div>
               </>
