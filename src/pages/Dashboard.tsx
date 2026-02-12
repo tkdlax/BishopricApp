@@ -54,13 +54,15 @@ export function Dashboard() {
     let cancelled = false;
     (async () => {
       const week = getWeekOfMonth(upcomingSun);
-      const [appointments, dayBlocks, recurring, peopleList] = await Promise.all([
+      const [appointments, dayBlocks, recurring, peopleList, exceptions] = await Promise.all([
         db.appointments.where('localDate').equals(upcomingSun).toArray(),
         db.dayBlocks.where('localDate').equals(upcomingSun).toArray(),
         db.recurringScheduleItems.where('templateId').equals(DEFAULT_TEMPLATE_ID).toArray(),
         db.people.toArray(),
+        db.scheduleItemExceptions.where('templateId').equals(DEFAULT_TEMPLATE_ID).toArray(),
       ]);
       if (cancelled) return;
+      const exceptionItemIds = new Set(exceptions.filter((e) => e.localDate === upcomingSun).map((e) => e.itemId));
       const nameBy = new Map(peopleList.map((p) => [p.id, p.nameListPreferred]));
       const list: DayEvent[] = [];
       const DURATION = 20;
@@ -81,6 +83,7 @@ export function Dashboard() {
         list.push({ type: 'block', id: b.id, start: b.startMinutes, end: b.endMinutes, label: b.label });
       }
       for (const r of recurring) {
+        if (exceptionItemIds.has(r.id)) continue;
         if (r.weekOfMonth !== 0 && r.weekOfMonth !== week) continue;
         list.push({ type: 'recurring', id: r.id, start: r.startMinutes, end: r.endMinutes, label: r.label });
       }
@@ -93,6 +96,15 @@ export function Dashboard() {
   const dueTotal = dueNow.confirmations + dueNow.queue;
   const timeSlots: number[] = [];
   for (let m = DAY_START; m < DAY_END; m += 30) timeSlots.push(m);
+  const today = todayLocalDate();
+  function getOverlapping(ev: DayEvent, evIndex: number): { index: number; total: number } {
+    const overlapping = dayEvents
+      .map((e, i) => ({ e, i }))
+      .filter(({ e }) => e.start < ev.end && e.end > ev.start)
+      .sort((a, b) => a.e.start - b.e.start);
+    const idx = overlapping.findIndex(({ i }) => i === evIndex);
+    return { index: idx < 0 ? 0 : idx, total: Math.max(1, overlapping.length) };
+  }
 
   return (
     <div className="max-w-[640px] mx-auto pb-6">
@@ -169,17 +181,42 @@ export function Dashboard() {
               ))}
             </div>
             <div className="flex-1 relative bg-slate-50/50 min-h-[200px]" style={{ height: Math.max(timeSlots.length * 20, 200) }}>
-              {dayEvents.map((ev) => {
-                const topPct = ((ev.start - DAY_START) / TOTAL_MINUTES) * 100;
-                const heightPct = ((ev.end - ev.start) / TOTAL_MINUTES) * 100;
+              {Array.from({ length: (DAY_END - DAY_START) / 60 + 1 }, (_, i) => (
+                <div
+                  key={`h-${i}`}
+                  className="absolute left-0 right-0 border-t border-slate-200/80"
+                  style={{ top: `${(i * 60 / TOTAL_MINUTES) * 100}%` }}
+                />
+              ))}
+              {upcomingSun === today && (() => {
+                const d = new Date();
+                const nowMinutes = d.getHours() * 60 + d.getMinutes();
+                if (nowMinutes < DAY_START || nowMinutes > DAY_END) return null;
                 return (
                   <div
-                    key={ev.id}
-                    className="absolute left-1 right-1 rounded border overflow-hidden text-xs font-medium shadow-sm"
+                    className="absolute left-0 right-0 z-10 h-0.5 bg-emerald-500"
+                    style={{ top: `${((nowMinutes - DAY_START) / TOTAL_MINUTES) * 100}%` }}
+                    aria-hidden
+                  />
+                );
+              })()}
+              {dayEvents.map((ev, evIndex) => {
+                const topPct = ((ev.start - DAY_START) / TOTAL_MINUTES) * 100;
+                const heightPct = ((ev.end - ev.start) / TOTAL_MINUTES) * 100;
+                const { index, total } = getOverlapping(ev, evIndex);
+                const gap = 2;
+                const widthPct = (100 - (total - 1) * gap) / total;
+                const leftPct = index * (widthPct + gap);
+                return (
+                  <div
+                    key={ev.type === 'recurring' ? `r-${ev.id}` : ev.id}
+                    className="absolute rounded border overflow-hidden text-xs font-medium shadow-sm"
                     style={{
                       top: `${topPct}%`,
                       height: `${Math.max(heightPct, 3)}%`,
                       minHeight: 18,
+                      left: `calc(${leftPct}% + 4px)`,
+                      width: `calc(${widthPct}% - ${4 + gap}px)`,
                       backgroundColor: ev.type === 'appointment' ? '#e0e7ff' : ev.type === 'block' ? '#d1fae5' : '#f3f4f6',
                       borderColor: ev.type === 'appointment' ? '#a5b4fc' : ev.type === 'block' ? '#6ee7b7' : '#e5e7eb',
                     }}

@@ -32,6 +32,13 @@ function AppShell() {
   const [navOrder, setNavOrder] = useState<string[]>(DEFAULT_NAV_ORDER);
 
   useEffect(() => {
+    const orient = typeof screen !== 'undefined' ? (screen as { orientation?: { lock?(mode: string): Promise<void> } }).orientation : undefined;
+    if (orient?.lock) {
+      orient.lock('portrait').catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
     db.settings.get(NAV_SETTINGS_KEY).then((s) => {
       const raw = s?.value;
       if (typeof raw === 'string') {
