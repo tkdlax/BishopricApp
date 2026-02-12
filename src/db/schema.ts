@@ -5,7 +5,7 @@
 
 import Dexie, { type EntityTable } from 'dexie';
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 export type HouseholdRole = 'HEAD' | 'SPOUSE' | 'OTHER';
 export type PersonRole = 'adult' | 'youth' | 'primary';
@@ -262,6 +262,31 @@ export interface BaptismCompletion {
   createdAt: number;
 }
 
+/** Youth interview (birthday/semi-annual) marked complete so it no longer appears. */
+export interface YouthInterviewCompletion {
+  id: string;
+  personId: string;
+  reasonKey: string;
+  year: number;
+  completedAt: number;
+  createdAt: number;
+}
+
+/** Advancement interview dismissed (won't happen) – remove from list without marking complete. */
+export interface AdvancementDismissal {
+  id: string;
+  personId: string;
+  office: string;
+  createdAt: number;
+}
+
+/** Baptism interview dismissed (won't happen) – remove from list without marking complete. */
+export interface BaptismDismissal {
+  id: string;
+  personId: string;
+  createdAt: number;
+}
+
 export class BishopricDb extends Dexie {
   households!: EntityTable<Household, 'id'>;
   people!: EntityTable<Person, 'id'>;
@@ -284,6 +309,9 @@ export class BishopricDb extends Dexie {
   customInterviewToGet!: EntityTable<CustomInterviewToGet, 'id'>;
   advancementCompletions!: EntityTable<AdvancementCompletion, 'id'>;
   baptismCompletions!: EntityTable<BaptismCompletion, 'id'>;
+  youthInterviewCompletions!: EntityTable<YouthInterviewCompletion, 'id'>;
+  advancementDismissals!: EntityTable<AdvancementDismissal, 'id'>;
+  baptismDismissals!: EntityTable<BaptismDismissal, 'id'>;
 
   constructor() {
     super('BishopricDb');
@@ -321,6 +349,11 @@ export class BishopricDb extends Dexie {
     this.version(7).stores({
       advancementCompletions: 'id, personId, office, completedAt, createdAt',
       baptismCompletions: 'id, personId, completedAt, createdAt',
+    });
+    this.version(8).stores({
+      youthInterviewCompletions: 'id, personId, reasonKey, year, completedAt, createdAt',
+      advancementDismissals: 'id, personId, office, createdAt',
+      baptismDismissals: 'id, personId, createdAt',
     });
   }
 }

@@ -9,7 +9,8 @@ import { getMessageRecipientPhone } from '../lib/contactRecipient';
 import { getPrayerAskMessage } from '../lib/templates';
 import type { SuggestedPerson } from '../lib/prayerSuggestions';
 import type { PrayerType, PrayerAssignment } from '../db/schema';
-import { MessageCircle, ChevronLeft, ChevronRight, X, Check } from 'lucide-react';
+import { MessageCircle, ChevronLeft, ChevronRight, X, Check, UserPlus } from 'lucide-react';
+import { PeoplePickerModal } from '../components/PeoplePickerModal';
 
 export function PrayerDashboard() {
   const today = todayLocalDate();
@@ -20,6 +21,8 @@ export function PrayerDashboard() {
   const [assignments, setAssignments] = useState<PrayerAssignment[]>([]);
   const [peopleById, setPeopleById] = useState<Map<string, { nameListPreferred: string }>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [showContactPicker, setShowContactPicker] = useState(false);
+  const [pickedPersonForSlot, setPickedPersonForSlot] = useState<{ id: string; nameListPreferred: string } | null>(null);
 
   const prevSunday = addDays(selectedSunday, -7);
   const nextSun = addDays(selectedSunday, 7);
@@ -94,6 +97,25 @@ export function PrayerDashboard() {
     await recordPrayerSkipped(personId, prayerType, selectedSunday);
     setOpening((prev) => prev.filter((s) => s.person.id !== personId));
     setClosing((prev) => prev.filter((s) => s.person.id !== personId));
+  };
+
+  const handleSlotFromContacts = async (personId: string, prayerType: PrayerType) => {
+    const now = Date.now();
+    const existing = assignments.find((a) => a.prayerType === prayerType);
+    if (existing) await db.prayerAssignments.delete(existing.id);
+    await db.prayerAssignments.add({
+      id: `pa-${now}-${Math.random().toString(36).slice(2, 9)}`,
+      personId,
+      localDate: selectedSunday,
+      prayerType,
+      status: 'asked',
+      askedAt: now,
+      createdAt: now,
+      updatedAt: now,
+    });
+    setAssignments(await db.prayerAssignments.where('localDate').equals(selectedSunday).toArray());
+    setPickedPersonForSlot(null);
+    setShowContactPicker(false);
   };
 
   const renderList = (list: SuggestedPerson[], type: PrayerType) => (
@@ -193,6 +215,19 @@ export function PrayerDashboard() {
             )}
           </div>
         </div>
+        <button type="button" onClick={() => setShowContactPicker(true)} className="flex items-center gap-2 mt-2 text-primary font-medium min-h-tap">
+          <UserPlus size={18} /> Pick from contacts
+        </button>
+        {pickedPersonForSlot && (
+          <div className="mt-2 p-3 bg-slate-50 rounded-lg">
+            <p className="text-sm text-muted mb-2">Assign {pickedPersonForSlot.nameListPreferred} to:</p>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => handleSlotFromContacts(pickedPersonForSlot.id, 'opening')} className="px-3 py-2 rounded-lg border border-border bg-white font-medium text-sm">Opening</button>
+              <button type="button" onClick={() => handleSlotFromContacts(pickedPersonForSlot.id, 'closing')} className="px-3 py-2 rounded-lg border border-border bg-white font-medium text-sm">Closing</button>
+              <button type="button" onClick={() => setPickedPersonForSlot(null)} className="text-muted text-sm">Cancel</button>
+            </div>
+          </div>
+        )}
       </Section>
 
       <Section heading="Opening prayer suggestions">
@@ -202,6 +237,14 @@ export function PrayerDashboard() {
         {closing.filter((s) => !assignedIds.has(s.person.id)).length === 0 ? <p className="text-muted text-sm">No suggestions.</p> : renderList(closing.filter((s) => !assignedIds.has(s.person.id)), 'closing')}
       </Section>
       <Link to="/messages" className="text-primary font-semibold min-h-tap inline-block mt-2">Open Message Center</Link>
+
+      {showContactPicker && (
+        <PeoplePickerModal
+          onSelect={(p) => { setPickedPersonForSlot({ id: p.id, nameListPreferred: p.nameListPreferred }); setShowContactPicker(false); }}
+          onClose={() => setShowContactPicker(false)}
+          filter={(p) => !p.doNotAskForPrayer && !p.inactive}
+        />
+      )}
     </PageLayout>
   );
 }

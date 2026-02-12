@@ -43,6 +43,7 @@ export function BackupRestore() {
         'households', 'people', 'appointments', 'prayerAssignments', 'messageQueue',
         'templates', 'settings', 'blackoutDates', 'dayBlocks', 'interviewToGetDismissals',
         'interviewToGetNotes', 'customInterviewToGet', 'advancementCompletions', 'baptismCompletions',
+        'youthInterviewCompletions', 'advancementDismissals', 'baptismDismissals',
         'prayerHistory', 'prayerSkipped',
       ] as const;
       const payload: Record<string, unknown[]> = {};

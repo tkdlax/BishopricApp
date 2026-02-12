@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../db/schema';
 import { getDueNowCounts } from '../lib/dueRules';
-import { getMonthInterviews, formatSundayLabel, formatTimeAmPm, type MonthInterviewRow } from '../lib/monthInterviews';
-import { upcomingSunday, todayLocalDate } from '../lib/scheduling';
+import { formatSundayLabel, formatTimeAmPm } from '../lib/monthInterviews';
+import { upcomingSunday, todayLocalDate, getWeekOfMonth } from '../lib/scheduling';
 import {
   CalendarPlus,
   List,
@@ -21,23 +21,26 @@ import {
   ChevronUp,
 } from 'lucide-react';
 
-interface CustomItem { id: string; label: string; personId?: string }
+const DEFAULT_TEMPLATE_ID = 'schedule-monthly-sunday';
+const DAY_START = 8 * 60;
+const DAY_END = 18 * 60;
+const TOTAL_MINUTES = DAY_END - DAY_START;
+
+type DayEvent =
+  | { type: 'appointment'; id: string; personId?: string; personName?: string; start: number; end: number; label: string }
+  | { type: 'block'; id: string; start: number; end: number; label: string }
+  | { type: 'recurring'; id: string; start: number; end: number; label: string };
 
 export function Dashboard() {
   const [dueNow, setDueNow] = useState({ confirmations: 0, queue: 0 });
-  const [monthInterviews, setMonthInterviews] = useState<MonthInterviewRow[]>([]);
-  const [upcomingSundayCount, setUpcomingSundayCount] = useState(0);
-  const [customInterviews, setCustomInterviews] = useState<CustomItem[]>([]);
+  const [customInterviews, setCustomInterviews] = useState<{ id: string; label: string; personId?: string }[]>([]);
   const [otherExpanded, setOtherExpanded] = useState(false);
+  const [dayEvents, setDayEvents] = useState<DayEvent[]>([]);
 
   const upcomingSun = upcomingSunday(todayLocalDate());
 
   useEffect(() => {
     getDueNowCounts().then(setDueNow);
-  }, []);
-
-  useEffect(() => {
-    getMonthInterviews().then(setMonthInterviews);
   }, []);
 
   useEffect(() => {
@@ -48,24 +51,48 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => {
-    db.appointments
-      .where('localDate')
-      .equals(upcomingSun)
-      .filter((a) => a.type === 'bishop_interview' && a.status !== 'canceled')
-      .count()
-      .then(setUpcomingSundayCount);
+    let cancelled = false;
+    (async () => {
+      const week = getWeekOfMonth(upcomingSun);
+      const [appointments, dayBlocks, recurring, peopleList] = await Promise.all([
+        db.appointments.where('localDate').equals(upcomingSun).toArray(),
+        db.dayBlocks.where('localDate').equals(upcomingSun).toArray(),
+        db.recurringScheduleItems.where('templateId').equals(DEFAULT_TEMPLATE_ID).toArray(),
+        db.people.toArray(),
+      ]);
+      if (cancelled) return;
+      const nameBy = new Map(peopleList.map((p) => [p.id, p.nameListPreferred]));
+      const list: DayEvent[] = [];
+      const DURATION = 20;
+      for (const a of appointments) {
+        if (a.status === 'canceled') continue;
+        const end = a.minutesFromMidnight + (a.durationMinutes ?? DURATION);
+        list.push({
+          type: 'appointment',
+          id: a.id,
+          personId: a.personId,
+          personName: nameBy.get(a.personId),
+          start: a.minutesFromMidnight,
+          end,
+          label: nameBy.get(a.personId) ?? 'Interview',
+        });
+      }
+      for (const b of dayBlocks) {
+        list.push({ type: 'block', id: b.id, start: b.startMinutes, end: b.endMinutes, label: b.label });
+      }
+      for (const r of recurring) {
+        if (r.weekOfMonth !== 0 && r.weekOfMonth !== week) continue;
+        list.push({ type: 'recurring', id: r.id, start: r.startMinutes, end: r.endMinutes, label: r.label });
+      }
+      list.sort((a, b) => a.start - b.start);
+      setDayEvents(list);
+    })();
+    return () => { cancelled = true; };
   }, [upcomingSun]);
 
-  const today = todayLocalDate();
-  const monthUpcoming = monthInterviews.filter((row) => row.localDate >= today);
-  const bySunday: Record<string, MonthInterviewRow[]> = monthUpcoming.reduce((acc, row) => {
-    if (!acc[row.localDate]) acc[row.localDate] = [];
-    acc[row.localDate].push(row);
-    return acc;
-  }, {} as Record<string, MonthInterviewRow[]>);
-  const sundayDates = Object.keys(bySunday).sort();
-
   const dueTotal = dueNow.confirmations + dueNow.queue;
+  const timeSlots: number[] = [];
+  for (let m = DAY_START; m < DAY_END; m += 30) timeSlots.push(m);
 
   return (
     <div className="max-w-[640px] mx-auto pb-6">
@@ -105,86 +132,70 @@ export function Dashboard() {
           </Link>
 
           <Link
-            to="/day"
+            to="/interviews-to-get"
             className="card flex items-center justify-between gap-4 p-4 no-underline text-inherit hover:shadow-md active:scale-[0.99] transition-all"
           >
             <div className="flex items-center gap-4 min-w-0">
               <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                <List size={24} className="text-primary" />
+                <ClipboardCheck size={24} className="text-primary" />
               </div>
               <div>
-                <span className="font-semibold block">Upcoming Sunday</span>
-                <span className="text-muted text-sm">{formatSundayLabel(upcomingSun)}</span>
+                <span className="font-semibold block">Interviews to get</span>
+                <span className="text-muted text-sm">
+                  {customInterviews.length > 0 ? `${customInterviews.length} on your list` : 'Custom list, youth, advancement, baptism'}
+                </span>
               </div>
             </div>
-            <span className="text-muted text-sm shrink-0">
-              {upcomingSundayCount} interview{upcomingSundayCount !== 1 ? 's' : ''}
-            </span>
             <ChevronRight size={20} className="text-muted shrink-0" />
           </Link>
         </div>
       </section>
 
-      {customInterviews.length > 0 && (
-        <section className="mb-6">
-          <div className="flex items-center justify-between gap-2 mb-3">
-            <h3 className="text-sm font-semibold text-muted uppercase tracking-wide m-0">My interviews to get</h3>
-            <Link to="/interviews-to-get" className="text-primary font-medium text-sm min-h-tap">View all</Link>
-          </div>
-          <div className="card">
-            <ul className="list-none p-0 m-0">
-              {customInterviews.slice(0, 5).map((c) => (
-                <li key={c.id}>
-                  <Link
-                    to={c.personId ? `/contacts/person/${c.personId}` : '/interviews-to-get'}
-                    className="card-row flex items-center gap-3 no-underline text-inherit"
-                  >
-                    <span className="flex-1 min-w-0 font-medium truncate">{c.label}</span>
-                    <ChevronRight size={18} className="text-muted shrink-0" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-            {customInterviews.length > 5 && (
-              <Link to="/interviews-to-get" className="card-row flex items-center gap-3 no-underline text-inherit text-muted text-sm">
-                <span className="flex-1">+{customInterviews.length - 5} more</span>
-                <ChevronRight size={18} className="shrink-0" />
-              </Link>
-            )}
-          </div>
-        </section>
-      )}
-
       <section className="mb-6">
-        <h3 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">This month&apos;s interviews</h3>
-        <div className="card">
-          {sundayDates.length === 0 ? (
-            <div className="p-5 text-center text-muted text-sm">
-              No interviews this month. Schedule someone or open Hallway from More below.
-            </div>
-          ) : (
-            <ul className="list-none p-0 m-0">
-              {sundayDates.map((localDate) => (
-                <li key={localDate}>
-                  <div className="px-4 pt-3 pb-1 text-muted text-xs font-semibold uppercase tracking-wide">
-                    {formatSundayLabel(localDate)}
-                  </div>
-                  {bySunday[localDate].map((row: MonthInterviewRow) => (
-                    <Link
-                      key={row.appointmentId}
-                      to={`/appointment/${row.appointmentId}`}
-                      className="card-row flex items-center gap-3 no-underline text-inherit"
-                    >
-                      <span className="flex-1 min-w-0 font-medium">
-                        {formatTimeAmPm(row.minutesFromMidnight)} – {row.personName}
-                      </span>
-                      <ChevronRight size={18} className="text-muted shrink-0" />
-                    </Link>
-                  ))}
-                </li>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h3 className="text-sm font-semibold text-muted uppercase tracking-wide m-0">Upcoming interviews</h3>
+          <Link to="/day" className="text-primary font-medium text-sm min-h-tap">Full day view</Link>
+        </div>
+        <div className="card overflow-hidden">
+          <div className="px-4 py-2 border-b border-border text-muted text-xs font-semibold uppercase tracking-wide">
+            {formatSundayLabel(upcomingSun)}
+          </div>
+          <div className="flex">
+            <div className="w-14 shrink-0 border-r border-border py-1">
+              {timeSlots.map((m) => (
+                <div key={m} className="text-[10px] text-muted font-mono leading-5 h-5" style={{ height: 20 }}>
+                  {formatTimeAmPm(m)}
+                </div>
               ))}
-            </ul>
-          )}
+            </div>
+            <div className="flex-1 relative bg-slate-50/50 min-h-[200px]" style={{ height: Math.max(timeSlots.length * 20, 200) }}>
+              {dayEvents.map((ev) => {
+                const topPct = ((ev.start - DAY_START) / TOTAL_MINUTES) * 100;
+                const heightPct = ((ev.end - ev.start) / TOTAL_MINUTES) * 100;
+                return (
+                  <div
+                    key={ev.id}
+                    className="absolute left-1 right-1 rounded border overflow-hidden text-xs font-medium shadow-sm"
+                    style={{
+                      top: `${topPct}%`,
+                      height: `${Math.max(heightPct, 3)}%`,
+                      minHeight: 18,
+                      backgroundColor: ev.type === 'appointment' ? '#e0e7ff' : ev.type === 'block' ? '#d1fae5' : '#f3f4f6',
+                      borderColor: ev.type === 'appointment' ? '#a5b4fc' : ev.type === 'block' ? '#6ee7b7' : '#e5e7eb',
+                    }}
+                  >
+                    {ev.type === 'appointment' ? (
+                      <Link to={`/appointment/${ev.id}`} className="block p-1 truncate no-underline text-inherit">
+                        {formatTimeAmPm(ev.start)} – {ev.label}
+                      </Link>
+                    ) : (
+                      <div className="p-1 truncate">{formatTimeAmPm(ev.start)} – {ev.label}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </section>
 

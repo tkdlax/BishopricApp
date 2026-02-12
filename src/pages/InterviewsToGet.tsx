@@ -15,7 +15,7 @@ import { getYouthReachOutBody } from '../lib/templates';
 import { getBishopLastNameForMessage } from '../lib/bishopForMessages';
 import { getHouseholdMembersWithPhones } from '../lib/contactRecipient';
 import { PeoplePickerModal } from '../components/PeoplePickerModal';
-import { User, Plus, ChevronDown, ChevronRight, Check, Calendar } from 'lucide-react';
+import { User, Plus, ChevronDown, ChevronRight, Check, Calendar, X } from 'lucide-react';
 import type { Person } from '../db/schema';
 
 const PERIOD_KEY = `${new Date().getFullYear()}-H1`;
@@ -41,30 +41,39 @@ export function InterviewsToGet() {
   const [reachOutTarget, setReachOutTarget] = useState<ReachOutTarget | null>(null);
   const [scheduleMenu, setScheduleMenu] = useState<string | null>(null);
   const [bulkAddQueue, setBulkAddQueue] = useState<YouthDueItem[]>([]);
+  const [youthCompletions, setYouthCompletions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     load();
   }, []);
 
   async function load() {
-    const [people, customList, dismissList, advDone, bapDone] = await Promise.all([
+    const year = new Date().getFullYear();
+    const [people, customList, dismissList, advDone, bapDone, youthDone, advDismissed, bapDismissed] = await Promise.all([
       db.people.toArray(),
       db.customInterviewToGet.toArray().then((list) => list.filter((c) => !c.completedAt)),
       db.interviewToGetDismissals.where('periodKey').equals(PERIOD_KEY).toArray(),
       db.advancementCompletions.toArray(),
       db.baptismCompletions.toArray(),
+      db.youthInterviewCompletions.where('year').equals(year).toArray(),
+      db.advancementDismissals.toArray(),
+      db.baptismDismissals.toArray(),
     ]);
     const youthItems = people.flatMap((p) => getYouthDueThisYear(p));
     setYouthDue(youthItems);
     const advCompleted = new Set(advDone.map((a) => `${a.personId}-${a.office}`));
     const bapCompleted = new Set(bapDone.map((b) => b.personId));
-    setAdvancement(getAdvancementCandidates(people).filter((c) => !advCompleted.has(`${c.person.id}-${c.office}`)));
-    setBaptism(getBaptismCandidates(people).filter((c) => !bapCompleted.has(c.person.id)));
+    const youthCompleted = new Set(youthDone.map((y) => `${y.personId}-${y.reasonKey}`));
+    const advDismissSet = new Set(advDismissed.map((a) => `${a.personId}-${a.office}`));
+    const bapDismissSet = new Set(bapDismissed.map((b) => b.personId));
+    setAdvancement(getAdvancementCandidates(people).filter((c) => !advCompleted.has(`${c.person.id}-${c.office}`) && !advDismissSet.has(`${c.person.id}-${c.office}`)));
+    setBaptism(getBaptismCandidates(people).filter((c) => !bapCompleted.has(c.person.id) && !bapDismissSet.has(c.person.id)));
     setCustom(customList.map((c) => ({ id: c.id, label: c.label, personId: c.personId, completedAt: c.completedAt })));
     setDismissals(new Set(dismissList.map((d) => `${d.personId}-${d.reasonKey}`)));
+    setYouthCompletions(youthCompleted);
   }
 
-  const filteredYouth = youthDue.filter((item) => !dismissals.has(`${item.person.id}-${item.reason}`));
+  const filteredYouth = youthDue.filter((item) => !dismissals.has(`${item.person.id}-${item.reason}`) && !youthCompletions.has(`${item.person.id}-${item.reason}`));
   const reasonLabel = (item: YouthDueItem) =>
     item.reason === 'birthday_month' ? 'Birthday month' : 'Semi-annual';
 
@@ -119,6 +128,56 @@ export function InterviewsToGet() {
       id: `bap-${now}-${Math.random().toString(36).slice(2, 9)}`,
       personId: c.person.id,
       completedAt: now,
+      createdAt: now,
+    });
+    setScheduleMenu(null);
+    load();
+  }
+
+  async function completeYouth(item: YouthDueItem) {
+    const now = Date.now();
+    await db.youthInterviewCompletions.add({
+      id: `youth-${now}-${Math.random().toString(36).slice(2, 9)}`,
+      personId: item.person.id,
+      reasonKey: item.reason,
+      year: item.year,
+      completedAt: now,
+      createdAt: now,
+    });
+    setScheduleMenu(null);
+    load();
+  }
+
+  async function clearYouth(item: YouthDueItem) {
+    const now = Date.now();
+    await db.interviewToGetDismissals.add({
+      id: `d-${now}-${Math.random().toString(36).slice(2, 9)}`,
+      personId: item.person.id,
+      reasonKey: item.reason,
+      periodKey: PERIOD_KEY,
+      createdAt: now,
+    });
+    setScheduleMenu(null);
+    load();
+  }
+
+  async function clearAdvancement(c: AdvancementCandidate) {
+    const now = Date.now();
+    await db.advancementDismissals.add({
+      id: `advd-${now}-${Math.random().toString(36).slice(2, 9)}`,
+      personId: c.person.id,
+      office: c.office,
+      createdAt: now,
+    });
+    setScheduleMenu(null);
+    load();
+  }
+
+  async function clearBaptism(c: BaptismCandidate) {
+    const now = Date.now();
+    await db.baptismDismissals.add({
+      id: `bapd-${now}-${Math.random().toString(36).slice(2, 9)}`,
+      personId: c.person.id,
       createdAt: now,
     });
     setScheduleMenu(null);
@@ -308,14 +367,18 @@ export function InterviewsToGet() {
                                 {item.person.nameListPreferred}
                               </Link>
                               <span className="text-muted text-sm shrink-0">{reasonLabel(item)}</span>
-                              <div className="relative shrink-0">
-                                <button type="button" onClick={() => setScheduleMenu(scheduleMenu === `y-${item.person.id}-${item.reason}` ? null : `y-${item.person.id}-${item.reason}`)} className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap" title="Schedule or reach out" aria-label="Schedule or reach out"><Calendar size={18} /></button>
-                                {scheduleMenu === `y-${item.person.id}-${item.reason}` && (
-                                  <div className="absolute right-0 top-full mt-1 py-1 bg-white border border-border rounded-lg shadow-lg z-10 min-w-[140px]">
-                                    <button type="button" onClick={() => openReachOut({ kind: 'youth', item })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Reach out</button>
-                                    <button type="button" onClick={() => scheduleCalendar({ kind: 'youth', item })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Schedule</button>
-                                  </div>
-                                )}
+                              <div className="flex items-center gap-1 shrink-0">
+                                <div className="relative">
+                                  <button type="button" onClick={() => setScheduleMenu(scheduleMenu === `y-${item.person.id}-${item.reason}` ? null : `y-${item.person.id}-${item.reason}`)} className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap" title="Schedule or reach out"><Calendar size={18} /></button>
+                                  {scheduleMenu === `y-${item.person.id}-${item.reason}` && (
+                                    <div className="absolute right-0 top-full mt-1 py-1 bg-white border border-border rounded-lg shadow-lg z-10 min-w-[140px]">
+                                      <button type="button" onClick={() => openReachOut({ kind: 'youth', item })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Reach out</button>
+                                      <button type="button" onClick={() => scheduleCalendar({ kind: 'youth', item })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Schedule</button>
+                                    </div>
+                                  )}
+                                </div>
+                                <button type="button" onClick={() => completeYouth(item)} className="p-2 rounded-lg text-accent hover:bg-accent/10 min-h-tap" title="Mark complete"><Check size={18} /></button>
+                                <button type="button" onClick={() => clearYouth(item)} className="p-2 rounded-lg text-muted hover:bg-slate-100 min-h-tap" title="Clear (won&apos;t happen)"><X size={18} /></button>
                               </div>
                             </div>
                           </li>
@@ -354,10 +417,12 @@ export function InterviewsToGet() {
                     <div className="absolute right-0 top-full mt-1 py-1 bg-white border border-border rounded-lg shadow-lg z-10 min-w-[140px]">
                       <button type="button" onClick={() => openReachOut({ kind: 'advancement', candidate: c })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Reach out</button>
                       <button type="button" onClick={() => scheduleCalendar({ kind: 'advancement', candidate: c })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Schedule</button>
+                      <button type="button" onClick={() => clearAdvancement(c)} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 text-muted">Clear (won&apos;t happen)</button>
                     </div>
                   )}
                 </div>
                 <button type="button" onClick={() => completeAdvancement(c)} className="p-2 rounded-lg text-accent hover:bg-accent/10 min-h-tap" title="Mark complete"><Check size={18} /></button>
+                <button type="button" onClick={() => clearAdvancement(c)} className="p-2 rounded-lg text-muted hover:bg-slate-100 min-h-tap" title="Clear"><X size={18} /></button>
               </div>
             </li>
           ))}
@@ -375,15 +440,17 @@ export function InterviewsToGet() {
               <span className="text-muted text-sm shrink-0">{c.eighthBirthday}</span>
               <div className="flex items-center gap-1 shrink-0">
                 <div className="relative">
-                  <button type="button" onClick={() => setScheduleMenu(scheduleMenu === `bap-${c.person.id}` ? null : `bap-${c.person.id}`)} className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap" title="Schedule or reach out" aria-label="Schedule or reach out"><Calendar size={18} /></button>
+                  <button type="button" onClick={() => setScheduleMenu(scheduleMenu === `bap-${c.person.id}` ? null : `bap-${c.person.id}`)} className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap" title="Schedule or reach out"><Calendar size={18} /></button>
                   {scheduleMenu === `bap-${c.person.id}` && (
                     <div className="absolute right-0 top-full mt-1 py-1 bg-white border border-border rounded-lg shadow-lg z-10 min-w-[140px]">
                       <button type="button" onClick={() => openReachOut({ kind: 'baptism', candidate: c })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Reach out</button>
                       <button type="button" onClick={() => scheduleCalendar({ kind: 'baptism', candidate: c })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Schedule</button>
+                      <button type="button" onClick={() => clearBaptism(c)} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 text-muted">Clear (won&apos;t happen)</button>
                     </div>
                   )}
                 </div>
                 <button type="button" onClick={() => completeBaptism(c)} className="p-2 rounded-lg text-accent hover:bg-accent/10 min-h-tap" title="Mark complete"><Check size={18} /></button>
+                <button type="button" onClick={() => clearBaptism(c)} className="p-2 rounded-lg text-muted hover:bg-slate-100 min-h-tap" title="Clear"><X size={18} /></button>
               </div>
             </li>
           ))}
