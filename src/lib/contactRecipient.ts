@@ -6,6 +6,16 @@
 import { db } from '../db/schema';
 import type { Person } from '../db/schema';
 
+/** True if person is under 18 (youth, primary, or birthDate indicates age < 18). Used to show "choose recipient" when adding confirmation text. */
+export function isUnder18(person: Person): boolean {
+  if (person.role === 'youth' || person.role === 'primary') return true;
+  if (!person.birthDate || person.birthDate.length < 10) return false;
+  const birthYear = parseInt(person.birthDate.slice(0, 4), 10);
+  if (Number.isNaN(birthYear)) return false;
+  const age = new Date().getFullYear() - birthYear;
+  return age < 18;
+}
+
 /**
  * Returns the phone number to use when sending a message to or about this person.
  * For youth: uses household defaultContactPreference (text_mom, text_dad, both, individual).

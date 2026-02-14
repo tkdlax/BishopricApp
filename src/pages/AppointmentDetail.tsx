@@ -10,7 +10,8 @@ import {
 } from '../lib/scheduling';
 import { getBlackoutDates } from '../lib/blackouts';
 import { getRenderedTemplate, getLocationSuffix, INTERVIEW_LOCATION_OPTIONS } from '../lib/templates';
-import { getMessageRecipientPhone } from '../lib/contactRecipient';
+import { getMessageRecipientPhone, isUnder18 } from '../lib/contactRecipient';
+import { RecipientPickerModal } from '../components/RecipientPickerModal';
 import { buildIcsForAppointment, downloadIcs } from '../lib/calendarExport';
 import { REACH_OUT_INTERVIEW_TYPES, getMessageTextForType } from '../lib/reachOutTemplate';
 import { formatSundayLabel } from '../lib/monthInterviews';
@@ -25,6 +26,7 @@ export const AppointmentDetail: FC = () => {
   const [person, setPerson] = useState<Person | null>(null);
   const [location, setLocation] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [showRecipientPicker, setShowRecipientPicker] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -78,10 +80,8 @@ export const AppointmentDetail: FC = () => {
     setAppointment((prev) => prev ? { ...prev, localDate: next.localDate, minutesFromMidnight: next.minutesFromMidnight, historyLog: log, updatedAt: now } : null);
   };
 
-  const handleAddToQueue = async () => {
+  const addToQueueWithPhone = async (phone: string) => {
     if (!appointment || !person) return;
-    const phone = await getMessageRecipientPhone(person);
-    if (!phone) return;
     const interviewKind = appointment.interviewKind ?? 'standard_interview';
     const typeName = getMessageTextForType(interviewKind);
     const dateLabel = appointment.localDate.replace(/-/g, '/');
@@ -105,6 +105,17 @@ export const AppointmentDetail: FC = () => {
       createdAt: now,
       updatedAt: now,
     });
+  };
+
+  const handleAddToQueue = async () => {
+    if (!appointment || !person) return;
+    if (isUnder18(person)) {
+      setShowRecipientPicker(true);
+      return;
+    }
+    const phone = await getMessageRecipientPhone(person);
+    if (!phone) return;
+    await addToQueueWithPhone(phone);
   };
 
   const handleAddToCalendar = () => {
@@ -250,6 +261,16 @@ export const AppointmentDetail: FC = () => {
             </ul>
           )}
         </div>
+      )}
+      {showRecipientPicker && person && (
+        <RecipientPickerModal
+          person={person}
+          onSelect={(phone) => {
+            if (phone) void addToQueueWithPhone(phone);
+            setShowRecipientPicker(false);
+          }}
+          onClose={() => setShowRecipientPicker(false)}
+        />
       )}
     </PageLayout>
   );

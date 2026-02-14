@@ -13,7 +13,8 @@ import { getBlackoutDates } from '../lib/blackouts';
 import { formatSundayLabel } from '../lib/monthInterviews';
 import { PeoplePickerModal } from '../components/PeoplePickerModal';
 import { getRenderedTemplate, getLocationSuffix, INTERVIEW_LOCATION_OPTIONS } from '../lib/templates';
-import { getMessageRecipientPhone } from '../lib/contactRecipient';
+import { getMessageRecipientPhone, isUnder18 } from '../lib/contactRecipient';
+import { RecipientPickerModal } from '../components/RecipientPickerModal';
 import { REACH_OUT_INTERVIEW_TYPES, getMessageTextForType } from '../lib/reachOutTemplate';
 import type { Person } from '../db/schema';
 import type { SlotInfo } from '../lib/scheduling';
@@ -36,6 +37,12 @@ export function HallwayMode() {
   const [customDate, setCustomDate] = useState(thisSunday);
   const [customTime, setCustomTime] = useState(14 * 60); // 2 PM
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [pendingRecipient, setPendingRecipient] = useState<{
+    person: Person;
+    id: string;
+    localDate: string;
+    minutesFromMidnight: number;
+  } | null>(null);
 
   const effectiveDuration = DURATION_OPTIONS.includes(duration) ? duration : (parseInt(customDuration, 10) || DEFAULT_DURATION);
   const interviewTypeName = getMessageTextForType(interviewKind);
@@ -86,6 +93,11 @@ export function HallwayMode() {
       createdAt: now,
       updatedAt: now,
     });
+    if (addToQueue && isUnder18(person)) {
+      setPendingRecipient({ person, id, localDate: slotPicker.localDate, minutesFromMidnight: slotPicker.minutesFromMidnight });
+      setSlotPicker(null);
+      return;
+    }
     if (addToQueue) {
       const phone = await getMessageRecipientPhone(person);
       if (phone) {
@@ -115,6 +127,38 @@ export function HallwayMode() {
     const dateLabel = slotPicker.localDate.replace(/-/g, '/');
     const timeLabel = formatTimeAmPm(slotPicker.minutesFromMidnight);
     setSuccessMessage(`Interview scheduled with ${person.nameListPreferred} on ${dateLabel} at ${timeLabel}`);
+    setTimeout(() => setSuccessMessage(null), 5000);
+  };
+
+  const handleRecipientChosen = async (phone: string | null) => {
+    const p = pendingRecipient;
+    if (!p) return;
+    setPendingRecipient(null);
+    const { person, id, localDate, minutesFromMidnight } = p;
+    if (phone) {
+      const now = Date.now();
+      const dateLabel = localDate.replace(/-/g, '/');
+      const timeLabel = formatTimeAmPm(minutesFromMidnight);
+      const locationSuffix = getLocationSuffix(location);
+      const body = await getRenderedTemplate(interviewKind, {
+        name: person.nameListPreferred,
+        date: dateLabel,
+        time: timeLabel,
+        interviewType: interviewTypeName,
+        locationSuffix,
+      });
+      await db.messageQueue.add({
+        id: `msg-${now}-${Math.random().toString(36).slice(2, 9)}`,
+        recipientPhone: phone,
+        renderedMessage: body,
+        relatedObjectType: 'appointment',
+        relatedObjectId: id,
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+    setSuccessMessage(`Interview scheduled with ${person.nameListPreferred} on ${localDate.replace(/-/g, '/')} at ${formatTimeAmPm(minutesFromMidnight)}`);
     setTimeout(() => setSuccessMessage(null), 5000);
   };
 
@@ -274,6 +318,13 @@ export function HallwayMode() {
               </label>
             </>
           }
+        />
+      )}
+      {pendingRecipient && (
+        <RecipientPickerModal
+          person={pendingRecipient.person}
+          onSelect={handleRecipientChosen}
+          onClose={() => handleRecipientChosen(null)}
         />
       )}
     </PageLayout>

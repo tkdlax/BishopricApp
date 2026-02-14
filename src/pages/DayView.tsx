@@ -13,7 +13,8 @@ import { formatLongDate } from '../lib/monthInterviews';
 import { PeoplePickerModal } from '../components/PeoplePickerModal';
 import type { Person } from '../db/schema';
 import { getRenderedTemplate } from '../lib/templates';
-import { getMessageRecipientPhone } from '../lib/contactRecipient';
+import { getMessageRecipientPhone, isUnder18 } from '../lib/contactRecipient';
+import { RecipientPickerModal } from '../components/RecipientPickerModal';
 import { getLocationSuffix } from '../lib/templates';
 import { REACH_OUT_INTERVIEW_TYPES, getMessageTextForType } from '../lib/reachOutTemplate';
 
@@ -42,6 +43,12 @@ export function DayView() {
   const [newBlockStart, setNewBlockStart] = useState(14 * 60);
   const [newBlockEnd, setNewBlockEnd] = useState(14 * 60 + 30);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [pendingRecipient, setPendingRecipient] = useState<{
+    person: Person;
+    id: string;
+    localDate: string;
+    minutesFromMidnight: number;
+  } | null>(null);
 
   const nextSun = nextSunday(today);
   const isThisSunday = selectedDate === defaultDate;
@@ -132,6 +139,24 @@ export function DayView() {
       createdAt: now,
       updatedAt: now,
     });
+    const finishAndAddEvent = () => {
+      setSlotPicker(null);
+      const newEv: DayEvent = {
+        type: 'appointment',
+        id,
+        personId: person.id,
+        personName: person.nameListPreferred,
+        start: slotPicker.minutesFromMidnight,
+        end: slotPicker.minutesFromMidnight + DURATION,
+        label: person.nameListPreferred,
+      };
+      setEvents((prev) => [...prev, newEv].sort((a, b) => a.start - b.start));
+    };
+    if (addToQueue && isUnder18(person)) {
+      setPendingRecipient({ person, id, localDate: slotPicker.localDate, minutesFromMidnight: slotPicker.minutesFromMidnight });
+      setSlotPicker(null);
+      return;
+    }
     if (addToQueue) {
       const phone = await getMessageRecipientPhone(person);
       if (phone) {
@@ -158,14 +183,45 @@ export function DayView() {
         });
       }
     }
-    setSlotPicker(null);
+    finishAndAddEvent();
+  };
+
+  const handleRecipientChosen = async (phone: string | null) => {
+    const p = pendingRecipient;
+    if (!p) return;
+    setPendingRecipient(null);
+    const { person, id, localDate, minutesFromMidnight } = p;
+    if (phone) {
+      const now = Date.now();
+      const dateLabel = localDate.replace(/-/g, '/');
+      const timeLabel = formatTimeAmPm(minutesFromMidnight);
+      const locationSuffix = getLocationSuffix();
+      const typeName = getMessageTextForType(INTERVIEW_KIND);
+      const body = await getRenderedTemplate(INTERVIEW_KIND, {
+        name: person.nameListPreferred,
+        date: dateLabel,
+        time: timeLabel,
+        interviewType: typeName,
+        locationSuffix,
+      });
+      await db.messageQueue.add({
+        id: `msg-${now}-${Math.random().toString(36).slice(2, 9)}`,
+        recipientPhone: phone,
+        renderedMessage: body,
+        relatedObjectType: 'appointment',
+        relatedObjectId: id,
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
     const newEv: DayEvent = {
       type: 'appointment',
       id,
       personId: person.id,
       personName: person.nameListPreferred,
-      start: slotPicker.minutesFromMidnight,
-      end: slotPicker.minutesFromMidnight + DURATION,
+      start: minutesFromMidnight,
+      end: minutesFromMidnight + DURATION,
       label: person.nameListPreferred,
     };
     setEvents((prev) => [...prev, newEv].sort((a, b) => a.start - b.start));
@@ -338,6 +394,14 @@ export function DayView() {
               </label>
             </>
           }
+        />
+      )}
+
+      {pendingRecipient && (
+        <RecipientPickerModal
+          person={pendingRecipient.person}
+          onSelect={handleRecipientChosen}
+          onClose={() => handleRecipientChosen(null)}
         />
       )}
 

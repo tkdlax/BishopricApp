@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { db } from '../db/schema';
-import { getMessageRecipientPhone } from '../lib/contactRecipient';
+import { getMessageRecipientPhone, isUnder18 } from '../lib/contactRecipient';
+import { RecipientPickerModal } from '../components/RecipientPickerModal';
 import { getBishopLastNameForMessage } from '../lib/bishopForMessages';
 import { buildReachOutMessage, REACH_OUT_INTERVIEW_TYPES, getMessageTextForType } from '../lib/reachOutTemplate';
 import { PeoplePickerModal } from '../components/PeoplePickerModal';
@@ -22,11 +23,35 @@ export function ScheduleInterview() {
   const [showPersonPicker, setShowPersonPicker] = useState(false);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRecipientPicker, setShowRecipientPicker] = useState(false);
 
   const interviewTypeDisplay = getMessageTextForType(selectedTypeKey);
 
+  async function addToQueueWithPhone(phone: string) {
+    if (!selectedPerson) return;
+    const bishopLastName = await getBishopLastNameForMessage();
+    const recipientName = selectedPerson.nameGiven || selectedPerson.nameListPreferred;
+    const message = buildReachOutMessage(recipientName, bishopLastName, interviewTypeDisplay);
+    const now = Date.now();
+    await db.messageQueue.add({
+      id: `mq-${now}-${Math.random().toString(36).slice(2, 9)}`,
+      recipientPhone: phone,
+      renderedMessage: message,
+      relatedObjectType: 'person',
+      relatedObjectId: selectedPerson.id,
+      status: 'pending',
+      createdAt: now,
+      updatedAt: now,
+    });
+    setMode('reach_out_done');
+  }
+
   async function handleAddToQueue() {
     if (!selectedPerson) return;
+    if (isUnder18(selectedPerson)) {
+      setShowRecipientPicker(true);
+      return;
+    }
     setAdding(true);
     setError(null);
     try {
@@ -36,21 +61,7 @@ export function ScheduleInterview() {
         setAdding(false);
         return;
       }
-      const bishopLastName = await getBishopLastNameForMessage();
-      const recipientName = selectedPerson.nameGiven || selectedPerson.nameListPreferred;
-      const message = buildReachOutMessage(recipientName, bishopLastName, interviewTypeDisplay);
-      const now = Date.now();
-      await db.messageQueue.add({
-        id: `mq-${now}-${Math.random().toString(36).slice(2, 9)}`,
-        recipientPhone: phone,
-        renderedMessage: message,
-        relatedObjectType: 'person',
-        relatedObjectId: selectedPerson.id,
-        status: 'pending',
-        createdAt: now,
-        updatedAt: now,
-      });
-      setMode('reach_out_done');
+      await addToQueueWithPhone(phone);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to add to queue');
     }
@@ -150,6 +161,16 @@ export function ScheduleInterview() {
           onSelect={(p) => { setSelectedPerson(p); setShowPersonPicker(false); }}
           onClose={() => setShowPersonPicker(false)}
           filter={(p) => !p.inactive && !p.doNotInterview}
+        />
+      )}
+      {showRecipientPicker && selectedPerson && (
+        <RecipientPickerModal
+          person={selectedPerson}
+          onSelect={(phone) => {
+            if (phone) void addToQueueWithPhone(phone);
+            setShowRecipientPicker(false);
+          }}
+          onClose={() => setShowRecipientPicker(false)}
         />
       )}
     </PageLayout>
