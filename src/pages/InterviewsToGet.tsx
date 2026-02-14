@@ -49,16 +49,18 @@ export function InterviewsToGet() {
 
   async function load() {
     const year = new Date().getFullYear();
-    const [people, customList, dismissList, advDone, bapDone, youthDone, advDismissed, bapDismissed] = await Promise.all([
+    const [people, customList, dismissList, advDone, bapDone, youthDoneThisYear, youthDoneNextYear, advDismissed, bapDismissed] = await Promise.all([
       db.people.toArray(),
       db.customInterviewToGet.toArray().then((list) => list.filter((c) => !c.completedAt)),
       db.interviewToGetDismissals.where('periodKey').equals(PERIOD_KEY).toArray(),
       db.advancementCompletions.toArray(),
       db.baptismCompletions.toArray(),
       db.youthInterviewCompletions.where('year').equals(year).toArray(),
+      db.youthInterviewCompletions.where('year').equals(year + 1).toArray(),
       db.advancementDismissals.toArray(),
       db.baptismDismissals.toArray(),
     ]);
+    const youthDone = [...youthDoneThisYear, ...youthDoneNextYear];
     const youthItems = people.flatMap((p) => getYouthDueThisYear(p));
     setYouthDue(youthItems);
     const advCompleted = new Set(advDone.map((a) => `${a.personId}-${a.office}`));
