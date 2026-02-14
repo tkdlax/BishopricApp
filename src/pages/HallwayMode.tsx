@@ -6,7 +6,7 @@ import {
   getInterviewSlotMinutes,
   upcomingSunday,
   todayLocalDate,
-  nextSunday,
+  addDays,
   formatTimeAmPm,
 } from '../lib/scheduling';
 import { getBlackoutDates } from '../lib/blackouts';
@@ -24,7 +24,7 @@ const DURATION_OPTIONS = [15, 20, 30];
 export function HallwayMode() {
   const today = todayLocalDate();
   const thisSunday = upcomingSunday(today);
-  const nextSun = nextSunday(today);
+  const nextSun = addDays(thisSunday, 7); // Sunday after this Sunday (avoids duplicate when today is not Sunday)
   const [slotsThis, setSlotsThis] = useState<SlotInfo[]>([]);
   const [slotsNext, setSlotsNext] = useState<SlotInfo[]>([]);
   const [duration, setDuration] = useState(DEFAULT_DURATION);
@@ -35,6 +35,7 @@ export function HallwayMode() {
   const [addToQueue, setAddToQueue] = useState(true);
   const [customDate, setCustomDate] = useState(thisSunday);
   const [customTime, setCustomTime] = useState(14 * 60); // 2 PM
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const effectiveDuration = DURATION_OPTIONS.includes(duration) ? duration : (parseInt(customDuration, 10) || DEFAULT_DURATION);
   const interviewTypeName = getMessageTextForType(interviewKind);
@@ -111,6 +112,10 @@ export function HallwayMode() {
       }
     }
     setSlotPicker(null);
+    const dateLabel = slotPicker.localDate.replace(/-/g, '/');
+    const timeLabel = formatTimeAmPm(slotPicker.minutesFromMidnight);
+    setSuccessMessage(`Interview scheduled with ${person.nameListPreferred} on ${dateLabel} at ${timeLabel}`);
+    setTimeout(() => setSuccessMessage(null), 5000);
   };
 
   const renderSlotGrid = (slots: SlotInfo[], localDate: string) => (
@@ -139,6 +144,11 @@ export function HallwayMode() {
 
   return (
     <PageLayout back="auto" title="Hallway mode">
+      {successMessage && (
+        <div className="mb-4 px-4 py-3 rounded-xl bg-emerald-100 border border-emerald-300 text-emerald-900 font-medium text-sm" role="status" aria-live="polite">
+          {successMessage}
+        </div>
+      )}
       <div className="card p-4 mb-5">
         <h3 className="text-sm font-semibold text-muted uppercase tracking-wide mb-3">Duration</h3>
         <div className="flex flex-wrap gap-2 items-center">

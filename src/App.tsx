@@ -26,10 +26,16 @@ function AppointmentDetailPage() {
   return <AppointmentDetail />;
 }
 
+const SW_UPDATE_READY_KEY = '__swUpdateReady';
+const SW_APPLY_UPDATE_KEY = '__swApplyUpdate';
+
 function AppShell() {
   const location = useLocation();
   const [showQueue, setShowQueue] = useState(false);
   const [navOrder, setNavOrder] = useState<string[]>(DEFAULT_NAV_ORDER);
+  const [updateAvailable, setUpdateAvailable] = useState(() =>
+    typeof window !== 'undefined' && (window as unknown as Record<string, unknown>)[SW_UPDATE_READY_KEY] === true
+  );
 
   useEffect(() => {
     const orient = typeof screen !== 'undefined' ? (screen as { orientation?: { lock?(mode: string): Promise<void> } }).orientation : undefined;
@@ -68,6 +74,12 @@ function AppShell() {
     };
     window.addEventListener('navOrderUpdated', handler);
     return () => window.removeEventListener('navOrderUpdated', handler);
+  }, []);
+
+  useEffect(() => {
+    const onUpdate = () => setUpdateAvailable(true);
+    window.addEventListener('pwa-update-available', onUpdate);
+    return () => window.removeEventListener('pwa-update-available', onUpdate);
   }, []);
 
   const navPaths = useMemo(() => new Set(getAllNavPaths()), []);
@@ -127,6 +139,26 @@ function AppShell() {
         </nav>
       )}
       {showQueue && <QueueRunnerModal onClose={() => setShowQueue(false)} />}
+      {updateAvailable && (
+        <div
+          className={`fixed left-0 right-0 z-40 flex items-center justify-between gap-3 px-4 py-3 bg-amber-500 text-amber-950 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] ${showNav ? 'bottom-16' : 'bottom-0'}`}
+          style={showNav ? undefined : { paddingBottom: 'max(0.75rem, calc(env(safe-area-inset-bottom) + 0.75rem))' }}
+          role="status"
+          aria-live="polite"
+        >
+          <span className="font-medium text-sm">Reload for newest version</span>
+          <button
+            type="button"
+            onClick={() => {
+              const apply = (window as unknown as Record<string, (reload?: boolean) => Promise<void> | undefined>)[SW_APPLY_UPDATE_KEY];
+              void apply?.(true);
+            }}
+            className="shrink-0 px-4 py-2 rounded-lg bg-amber-900 text-amber-100 font-semibold text-sm min-h-tap hover:bg-amber-800 active:bg-amber-700 transition-colors"
+          >
+            Reload
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ const updateReload = registerSW({
       const w = window as unknown as { __swUpdateReady?: boolean; __swApplyUpdate?: (reload: boolean) => Promise<void> };
       w.__swUpdateReady = true;
       w.__swApplyUpdate = updateReload;
+      window.dispatchEvent(new CustomEvent('pwa-update-available'));
     }
   },
 });

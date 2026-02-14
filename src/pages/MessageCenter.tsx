@@ -7,7 +7,7 @@ import { PeoplePickerModal } from '../components/PeoplePickerModal';
 import { getHouseholdMembersWithPhones } from '../lib/contactRecipient';
 import type { MessageQueueItem } from '../db/schema';
 import type { Person } from '../db/schema';
-import { Play, Plus } from 'lucide-react';
+import { Play, Plus, Trash2 } from 'lucide-react';
 
 const cardClass = 'bg-white rounded-lg border border-border shadow-sm p-4';
 
@@ -50,6 +50,16 @@ export function MessageCenter() {
     setEditText('');
   }
 
+  async function removeFromQueue(item: MessageQueueItem) {
+    if (!window.confirm('Remove this message from the queue? It will not be sent.')) return;
+    await db.messageQueue.delete(item.id);
+    setPending((prev) => prev.filter((i) => i.id !== item.id));
+    if (editingId === item.id) {
+      setEditingId(null);
+      setEditText('');
+    }
+  }
+
   return (
     <PageLayout back="auto" title="Message Center">
       <Section heading="Pending messages">
@@ -88,7 +98,12 @@ export function MessageCenter() {
                 ) : (
                   <>
                     <pre className="text-sm whitespace-pre-wrap font-sans bg-slate-50 border border-border rounded p-2 max-h-32 overflow-auto">{item.renderedMessage}</pre>
-                    <button type="button" onClick={() => startEdit(item)} className="text-primary font-medium text-sm min-h-tap mt-2">Edit message</button>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      <button type="button" onClick={() => startEdit(item)} className="text-primary font-medium text-sm min-h-tap">Edit message</button>
+                      <button type="button" onClick={() => removeFromQueue(item)} className="text-red-600 font-medium text-sm min-h-tap flex items-center gap-1" title="Remove from queue">
+                        <Trash2 size={16} /> Remove
+                      </button>
+                    </div>
                   </>
                 )}
               </li>
