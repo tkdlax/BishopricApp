@@ -15,11 +15,14 @@ export function PeoplePickerModal({
   onSelect,
   onClose,
   filter,
+  extraContent,
 }: {
   onSelect: (person: Person) => void;
   onClose: () => void;
   /** Optional: only show people for whom filter(person) is true. Default: !inactive */
   filter?: (p: Person) => boolean;
+  /** Optional: render above the search (e.g. queue checkbox). Not auto-focused. */
+  extraContent?: React.ReactNode;
 }) {
   const [people, setPeople] = useState<Person[]>([]);
   const [search, setSearch] = useState('');
@@ -40,6 +43,7 @@ export function PeoplePickerModal({
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent>
         <DialogTitle>Select person</DialogTitle>
+        {extraContent && <div className="mb-4">{extraContent}</div>}
         <input
           type="search"
           value={search}
@@ -47,6 +51,7 @@ export function PeoplePickerModal({
           placeholder="Search by name"
           className="border border-border rounded-lg px-3 py-2 w-full mb-3"
           aria-label="Search"
+          autoFocus={false}
         />
         <ul className="list-none p-0 m-0 max-h-[60vh] overflow-auto space-y-1">
           {filtered.map((p) => (

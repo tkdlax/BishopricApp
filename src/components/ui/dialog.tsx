@@ -12,7 +12,7 @@ export function DialogOverlay({
 }: ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>) {
   return (
     <DialogPrimitive.Overlay
-      className={`fixed inset-0 bg-black/50 ${className}`}
+      className={`fixed inset-0 z-50 bg-black/50 ${className}`}
       {...props}
     />
   );
@@ -27,7 +27,7 @@ export function DialogContent({
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
-        className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl p-6 max-h-[90vh] overflow-auto w-[80vw] max-w-[480px] ${className}`}
+        className={`fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-xl p-6 max-h-[90vh] overflow-auto w-[80vw] max-w-[480px] ${className}`}
         {...props}
       >
         {children}

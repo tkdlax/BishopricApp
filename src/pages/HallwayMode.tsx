@@ -33,6 +33,8 @@ export function HallwayMode() {
   const [location, setLocation] = useState('');
   const [slotPicker, setSlotPicker] = useState<{ localDate: string; minutesFromMidnight: number } | null>(null);
   const [addToQueue, setAddToQueue] = useState(true);
+  const [customDate, setCustomDate] = useState(thisSunday);
+  const [customTime, setCustomTime] = useState(14 * 60); // 2 PM
 
   const effectiveDuration = DURATION_OPTIONS.includes(duration) ? duration : (parseInt(customDuration, 10) || DEFAULT_DURATION);
   const interviewTypeName = getMessageTextForType(interviewKind);
@@ -58,6 +60,11 @@ export function HallwayMode() {
       setSlotsNext(sNext);
     })();
     return () => { cancelled = true; };
+  }, [thisSunday, nextSun]);
+
+  // Keep custom date in sync when thisSunday/nextSun change (e.g. day rollover)
+  useEffect(() => {
+    setCustomDate((d) => (d === thisSunday || d === nextSun ? d : thisSunday));
   }, [thisSunday, nextSun]);
 
   const handleSelectPerson = async (person: Person) => {
@@ -188,36 +195,76 @@ export function HallwayMode() {
         </select>
       </Section>
 
-      <Section heading={formatSundayLabel(thisSunday)}>
-        <div className="card p-4">
-          {renderSlotGrid(slotsThis, thisSunday)}
-          {slotsThis.length === 0 && <p className="text-muted text-sm">No slots.</p>}
+      <Section heading="Suggested times">
+        <div className="card p-4 space-y-4">
+          <div>
+            <h4 className="text-sm font-semibold text-muted mb-2">{formatSundayLabel(thisSunday)}</h4>
+            {renderSlotGrid(slotsThis, thisSunday)}
+            {slotsThis.length === 0 && <p className="text-muted text-sm">No slots.</p>}
+          </div>
+          <div>
+            <h4 className="text-sm font-semibold text-muted mb-2">{formatSundayLabel(nextSun)}</h4>
+            {renderSlotGrid(slotsNext, nextSun)}
+            {slotsNext.length === 0 && <p className="text-muted text-sm">No slots.</p>}
+          </div>
         </div>
       </Section>
 
-      <Section heading={formatSundayLabel(nextSun)}>
+      <Section heading="Custom date & time">
         <div className="card p-4">
-          {renderSlotGrid(slotsNext, nextSun)}
-          {slotsNext.length === 0 && <p className="text-muted text-sm">No slots.</p>}
+          <p className="text-muted text-sm mb-3">If the suggested times don&apos;t work, pick any date and time.</p>
+          <div className="grid grid-cols-2 gap-3 mb-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-muted">Date</span>
+              <input
+                type="date"
+                value={customDate}
+                onChange={(e) => setCustomDate(e.target.value)}
+                className="border border-border rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-sm font-medium text-muted">Time</span>
+              <select
+                value={customTime}
+                onChange={(e) => setCustomTime(Number(e.target.value))}
+                className="border border-border rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                {(() => {
+                  const options: number[] = [];
+                  for (let m = 8 * 60; m <= 18 * 60; m += 30) options.push(m);
+                  return options.map((m) => (
+                    <option key={m} value={m}>{formatTimeAmPm(m)}</option>
+                  ));
+                })()}
+              </select>
+            </label>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSlotPicker({ localDate: customDate, minutesFromMidnight: customTime })}
+            className="w-full px-4 py-2.5 rounded-xl border-2 border-primary bg-white text-primary font-semibold min-h-tap hover:bg-primary/10 active:bg-primary/15 transition-colors"
+          >
+            Pick person for this time
+          </button>
         </div>
       </Section>
 
       {slotPicker && (
-        <>
-          <div className="fixed inset-0 z-10 bg-black/30 backdrop-blur-[2px]" aria-hidden />
-          <div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-border rounded-t-2xl p-4 max-h-[70vh] overflow-auto shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
-            <p className="text-sm text-muted mb-2">Add confirmation to message queue?</p>
-            <label className="flex items-center gap-2 mb-4">
-              <input type="checkbox" checked={addToQueue} onChange={(e) => setAddToQueue(e.target.checked)} />
-              <span>Add to queue</span>
-            </label>
-            <PeoplePickerModal
-              onSelect={handleSelectPerson}
-              onClose={() => setSlotPicker(null)}
-              filter={(p) => !p.doNotInterview && !p.inactive}
-            />
-          </div>
-        </>
+        <PeoplePickerModal
+          onSelect={handleSelectPerson}
+          onClose={() => setSlotPicker(null)}
+          filter={(p) => !p.doNotInterview && !p.inactive}
+          extraContent={
+            <>
+              <p className="text-sm text-muted mb-2">Add confirmation to message queue?</p>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={addToQueue} onChange={(e) => setAddToQueue(e.target.checked)} />
+                <span>Add to queue</span>
+              </label>
+            </>
+          }
+        />
       )}
     </PageLayout>
   );

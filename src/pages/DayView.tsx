@@ -325,21 +325,20 @@ export function DayView() {
       </div>
 
       {slotPicker && (
-        <>
-          <div className="fixed inset-0 z-10 bg-black/30 backdrop-blur-[2px]" aria-hidden />
-          <div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-border rounded-t-2xl p-4 max-h-[70vh] overflow-auto shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
-            <p className="text-sm text-muted mb-2">Add confirmation to message queue?</p>
-            <label className="flex items-center gap-2 mb-4">
-              <input type="checkbox" checked={addToQueue} onChange={(e) => setAddToQueue(e.target.checked)} />
-              <span>Add confirmation to queue</span>
-            </label>
-            <PeoplePickerModal
-              onSelect={handleSelectPerson}
-              onClose={() => setSlotPicker(null)}
-              filter={(p) => !p.doNotInterview && !p.inactive}
-            />
-          </div>
-        </>
+        <PeoplePickerModal
+          onSelect={handleSelectPerson}
+          onClose={() => setSlotPicker(null)}
+          filter={(p) => !p.doNotInterview && !p.inactive}
+          extraContent={
+            <>
+              <p className="text-sm text-muted mb-2">Add confirmation to message queue?</p>
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={addToQueue} onChange={(e) => setAddToQueue(e.target.checked)} />
+                <span>Add confirmation to queue</span>
+              </label>
+            </>
+          }
+        />
       )}
 
       {showAddOther && (
