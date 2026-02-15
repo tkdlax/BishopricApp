@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PageLayout, Section } from '../components/ui';
 import { db } from '../db/schema';
+
+const LAST_BACKUP_AT_KEY = 'lastBackupAt';
+const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Simple XOR with key repeated. Not cryptographically strong; obfuscation only. */
 function xorBytes(data: Uint8Array, password: string): Uint8Array {
@@ -32,9 +35,18 @@ function base64Decode(str: string): Uint8Array {
 export function BackupRestore() {
   const [exportPassword, setExportPassword] = useState('');
   const [exportStatus, setExportStatus] = useState<string | null>(null);
+  const [includeDateInFilename, setIncludeDateInFilename] = useState(false);
   const [restorePassword, setRestorePassword] = useState('');
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [restoreStatus, setRestoreStatus] = useState<string | null>(null);
+  const [showBackupReminder, setShowBackupReminder] = useState(false);
+
+  useEffect(() => {
+    db.settings.get(LAST_BACKUP_AT_KEY).then((s) => {
+      const last = typeof s?.value === 'number' ? s.value : 0;
+      if (last > 0 && Date.now() - last > ONE_WEEK_MS) setShowBackupReminder(true);
+    });
+  }, []);
 
   const handleExport = async () => {
     setExportStatus(null);
@@ -59,9 +71,13 @@ export function BackupRestore() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `bishopric-backup-${new Date().toISOString().slice(0, 10)}.txt`;
+      const dateStr = new Date().toISOString().slice(0, 10);
+      a.download = includeDateInFilename ? `bishopric-backup-${dateStr}.txt` : 'bishopric-backup.txt';
       a.click();
       URL.revokeObjectURL(url);
+      const now = Date.now();
+      await db.settings.put({ id: LAST_BACKUP_AT_KEY, value: now, updatedAt: now });
+      setShowBackupReminder(false);
       setExportStatus('Download started.');
     } catch (e) {
       setExportStatus(e instanceof Error ? e.message : 'Export failed.');
@@ -96,8 +112,19 @@ export function BackupRestore() {
 
   return (
     <PageLayout back="auto" title="Backup and restore">
+      {showBackupReminder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={() => setShowBackupReminder(false)} aria-hidden>
+          <div className="bg-white rounded-xl shadow-xl p-5 max-w-sm w-full border border-border" onClick={(e) => e.stopPropagation()}>
+            <p className="text-slate-700 mb-4">Your last backup was over a week ago. Consider backing up now.</p>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => setShowBackupReminder(false)} className="border border-border rounded-lg px-4 py-2 font-medium min-h-tap">Dismiss</button>
+              <button type="button" onClick={() => { setShowBackupReminder(false); handleExport(); }} className="bg-primary text-white rounded-lg px-4 py-2 font-medium min-h-tap">Backup now</button>
+            </div>
+          </div>
+        </div>
+      )}
       <Section heading="Export backup">
-        <p className="text-muted text-sm mb-2">Encrypted backup stays on this device. Use a password you will remember for restore.</p>
+        <p className="text-muted text-sm mb-2">Encrypted backup stays on this device. Use a password you will remember for restore. Default file name overwrites the previous backup.</p>
         <input
           type="password"
           value={exportPassword}
@@ -105,6 +132,10 @@ export function BackupRestore() {
           placeholder="Password (optional)"
           className="border border-border rounded-lg px-3 py-2 w-full mb-2"
         />
+        <label className="flex items-center gap-2 mb-3 min-h-tap cursor-pointer">
+          <input type="checkbox" checked={includeDateInFilename} onChange={(e) => setIncludeDateInFilename(e.target.checked)} className="rounded border-border text-primary focus:ring-primary/40 w-4 h-4" />
+          <span className="text-sm text-slate-700">Include date in file name</span>
+        </label>
         <button type="button" onClick={handleExport} className="bg-primary text-white rounded-lg px-4 py-2 font-medium min-h-tap">
           Download backup
         </button>

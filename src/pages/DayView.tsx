@@ -123,6 +123,11 @@ export function DayView() {
     setRefreshKey((k) => k + 1);
   }
 
+  async function removeBlock(blockId: string) {
+    await db.dayBlocks.delete(blockId);
+    setEvents((prev) => prev.filter((e) => !(e.type === 'block' && e.id === blockId)));
+  }
+
   const handleSelectPerson = async (person: Person) => {
     if (!slotPicker) return;
     const slotStart = slotPicker.minutesFromMidnight;
@@ -356,8 +361,15 @@ export function DayView() {
                         </button>
                       </div>
                     ) : (
-                      <div className="p-2 truncate text-[13px] font-medium text-slate-700">
-                        {formatTimeAmPm(ev.start)} – {ev.label}
+                      <div className="p-2 flex items-center gap-1 min-h-0">
+                        <span className="truncate flex-1 text-[13px] font-medium text-slate-700">{formatTimeAmPm(ev.start)} – {ev.label}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeBlock(ev.id)}
+                          className="shrink-0 text-[10px] text-amber-700 font-medium px-1.5 py-0.5 rounded hover:bg-amber-100"
+                        >
+                          Remove
+                        </button>
                       </div>
                     )}
                   </div>

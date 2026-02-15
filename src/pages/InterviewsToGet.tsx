@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { db } from '../db/schema';
 import { PageLayout, Section } from '../components/ui';
@@ -14,6 +15,7 @@ import { buildReachOutMessage } from '../lib/reachOutTemplate';
 import { getYouthReachOutBody } from '../lib/templates';
 import { getBishopLastNameForMessage } from '../lib/bishopForMessages';
 import { getHouseholdMembersWithPhones } from '../lib/contactRecipient';
+import { todayLocalDate, addDays } from '../lib/scheduling';
 import { PeoplePickerModal } from '../components/PeoplePickerModal';
 import { User, Plus, ChevronDown, ChevronRight, Check, Calendar, X } from 'lucide-react';
 import type { Person } from '../db/schema';
@@ -21,10 +23,12 @@ import type { Person } from '../db/schema';
 const PERIOD_KEY = `${new Date().getFullYear()}-H1`;
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
+type CustomItem = { id: string; label: string; personId?: string; notes?: string; targetDay?: string; completedAt?: number };
 type ReachOutTarget =
   | { kind: 'advancement'; candidate: AdvancementCandidate }
   | { kind: 'baptism'; candidate: BaptismCandidate }
-  | { kind: 'youth'; item: YouthDueItem };
+  | { kind: 'youth'; item: YouthDueItem }
+  | { kind: 'custom'; item: CustomItem; person: Person | null };
 
 export function InterviewsToGet() {
   const navigate = useNavigate();
@@ -42,8 +46,26 @@ export function InterviewsToGet() {
   const [customPerson, setCustomPerson] = useState<Person | null>(null);
   const [reachOutTarget, setReachOutTarget] = useState<ReachOutTarget | null>(null);
   const [scheduleMenu, setScheduleMenu] = useState<string | null>(null);
+  const [scheduleMenuAnchor, setScheduleMenuAnchor] = useState<{ top: number; left: number } | null>(null);
   const [bulkAddQueue, setBulkAddQueue] = useState<YouthDueItem[]>([]);
   const [youthCompletions, setYouthCompletions] = useState<Set<string>>(new Set());
+  const [youthDismissalIdByKey, setYouthDismissalIdByKey] = useState<Map<string, string>>(new Map());
+  const [dismissedAdvancement, setDismissedAdvancement] = useState<{ candidate: AdvancementCandidate; dismissalId: string }[]>([]);
+  const [dismissedBaptism, setDismissedBaptism] = useState<{ candidate: BaptismCandidate; dismissalId: string }[]>([]);
+  const [dismissedYouthCollapsed, setDismissedYouthCollapsed] = useState(true);
+  const [dismissedAdvCollapsed, setDismissedAdvCollapsed] = useState(true);
+  const [dismissedBapCollapsed, setDismissedBapCollapsed] = useState(true);
+
+  function openScheduleMenu(key: string, e: React.MouseEvent) {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setScheduleMenuAnchor({ top: rect.bottom + 4, left: Math.max(8, rect.right - 140) });
+    setScheduleMenu(key);
+  }
+
+  function closeScheduleMenu() {
+    setScheduleMenu(null);
+    setScheduleMenuAnchor(null);
+  }
 
   useEffect(() => {
     load();
@@ -74,6 +96,19 @@ export function InterviewsToGet() {
     setBaptism(getBaptismCandidates(people).filter((c) => !bapCompleted.has(c.person.id) && !bapDismissSet.has(c.person.id)));
     setCustom(customList.map((c) => ({ id: c.id, label: c.label, personId: c.personId, notes: c.notes, targetDay: c.targetDay, completedAt: c.completedAt })));
     setDismissals(new Set(dismissList.map((d) => `${d.personId}-${d.reasonKey}`)));
+    setYouthDismissalIdByKey(new Map(dismissList.map((d) => [`${d.personId}-${d.reasonKey}`, d.id])));
+    setDismissedAdvancement(
+      getAdvancementCandidates(people)
+        .filter((c) => advDismissSet.has(`${c.person.id}-${c.office}`))
+        .map((c) => ({ candidate: c, dismissalId: advDismissed.find((d) => d.personId === c.person.id && d.office === c.office)?.id }))
+        .filter((x): x is { candidate: AdvancementCandidate; dismissalId: string } => !!x.dismissalId)
+    );
+    setDismissedBaptism(
+      getBaptismCandidates(people)
+        .filter((c) => bapDismissSet.has(c.person.id))
+        .map((c) => ({ candidate: c, dismissalId: bapDismissed.find((d) => d.personId === c.person.id)?.id }))
+        .filter((x): x is { candidate: BaptismCandidate; dismissalId: string } => !!x.dismissalId)
+    );
     setYouthCompletions(youthCompleted);
   }
 
@@ -91,6 +126,13 @@ export function InterviewsToGet() {
     return byMonth;
   })();
   const monthsWithYouth = Object.keys(youthByMonthThenLeader).map(Number).sort((a, b) => a - b);
+
+  const today = todayLocalDate();
+  const in14Days = addDays(today, 14);
+  const currentMonth = new Date().getMonth() + 1;
+  const reachOutSoonCustom = custom.filter((c) => c.targetDay && c.targetDay <= in14Days);
+  const reachOutSoonYouth = filteredYouth.filter((item) => item.month === currentMonth);
+  const hasReachOutSoon = reachOutSoonCustom.length > 0 || reachOutSoonYouth.length > 0;
 
   async function addCustom() {
     const name = customName.trim();
@@ -165,7 +207,23 @@ export function InterviewsToGet() {
       periodKey: PERIOD_KEY,
       createdAt: now,
     });
-    setScheduleMenu(null);
+    closeScheduleMenu();
+    load();
+  }
+
+  async function addBackYouth(item: YouthDueItem) {
+    const id = youthDismissalIdByKey.get(`${item.person.id}-${item.reason}`);
+    if (id) await db.interviewToGetDismissals.delete(id);
+    load();
+  }
+
+  async function addBackAdvancement(dismissalId: string) {
+    await db.advancementDismissals.delete(dismissalId);
+    load();
+  }
+
+  async function addBackBaptism(dismissalId: string) {
+    await db.baptismDismissals.delete(dismissalId);
     load();
   }
 
@@ -193,14 +251,20 @@ export function InterviewsToGet() {
   }
 
   function openReachOut(target: ReachOutTarget) {
-    setScheduleMenu(null);
+    closeScheduleMenu();
     setReachOutTarget(target);
   }
 
+  async function openReachOutCustom(c: CustomItem) {
+    closeScheduleMenu();
+    const person = c.personId ? await db.people.get(c.personId) ?? null : null;
+    setReachOutTarget({ kind: 'custom', item: c, person });
+  }
+
   function scheduleCalendar(target: ReachOutTarget) {
-    setScheduleMenu(null);
-    const personId = target.kind === 'advancement' ? target.candidate.person.id : target.kind === 'baptism' ? target.candidate.person.id : target.item.person.id;
-    navigate('/schedule', { state: { personId } });
+    closeScheduleMenu();
+    const personId = target.kind === 'advancement' ? target.candidate.person.id : target.kind === 'baptism' ? target.candidate.person.id : target.kind === 'youth' ? target.item.person.id : target.kind === 'custom' ? target.item.personId ?? undefined : undefined;
+    navigate(personId ? '/schedule' : '/hallway', personId ? { state: { personId } } : undefined);
   }
 
   async function pickRecipientForReachOut(recipient: Person) {
@@ -219,6 +283,8 @@ export function InterviewsToGet() {
       interviewTypeDisplay = `${target.candidate.office} ordination interview`;
     } else if (target.kind === 'baptism') {
       interviewTypeDisplay = 'baptism interview';
+    } else if (target.kind === 'custom') {
+      interviewTypeDisplay = target.item.label;
     } else {
       const item = target.item;
       interviewTypeDisplay = item.reason === 'birthday_month'
@@ -261,6 +327,27 @@ export function InterviewsToGet() {
 
   return (
     <PageLayout back="auto" title="Interviews to get">
+      {hasReachOutSoon && (
+        <Section heading="Reach out soon">
+          <p className="text-muted text-sm mb-2">Custom items with a target day due or overdue, and youth due this month. Add to message queue to reach out.</p>
+          <ul className="list-none p-0 m-0 space-y-2">
+            {reachOutSoonCustom.map((c) => (
+              <li key={`custom-${c.id}`} className="card flex items-center gap-2 py-2 px-3 rounded-xl border border-border">
+                <span className="flex-1 font-medium truncate">{c.label}</span>
+                {c.targetDay && <span className="text-muted text-sm shrink-0">{c.targetDay.replace(/-/g, '/')}</span>}
+                <button type="button" onClick={() => openReachOutCustom(c)} className="text-primary text-sm font-semibold min-h-tap py-1 px-2 rounded hover:bg-primary/10">Add to queue</button>
+              </li>
+            ))}
+            {reachOutSoonYouth.map((item) => (
+              <li key={`youth-${item.person.id}-${item.reason}`} className="card flex items-center gap-2 py-2 px-3 rounded-xl border border-border">
+                <span className="flex-1 font-medium truncate">{item.person.nameListPreferred}</span>
+                <span className="text-muted text-sm shrink-0">{reasonLabel(item)}</span>
+                <button type="button" onClick={() => openReachOut({ kind: 'youth', item })} className="text-primary text-sm font-semibold min-h-tap py-1 px-2 rounded hover:bg-primary/10">Add to queue</button>
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
       <Section heading="My checklist">
         <div className="card p-4 mb-3">
           {custom.length === 0 && !showAddCustom && (
@@ -268,32 +355,25 @@ export function InterviewsToGet() {
           )}
           <ul className="list-none p-0 m-0 space-y-2">
             {custom.map((c) => (
-              <li key={c.id} className="py-3 px-3 rounded-xl border border-border bg-white">
-                <div className="flex flex-wrap items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <span className="font-medium block">{c.label}</span>
-                    {c.notes && <p className="text-sm text-muted mt-0.5 mb-1 whitespace-pre-wrap">{c.notes}</p>}
-                    {c.targetDay && (
-                      <span className="text-xs text-muted">Target: {c.targetDay.replace(/-/g, '/')}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 shrink-0">
-                    {c.personId && (
-                      <>
-                        <Link to={`/contacts/person/${c.personId}`} className="text-primary text-sm font-medium min-h-tap py-1 px-2">View</Link>
-                        <button type="button" onClick={() => navigate('/schedule', { state: { personId: c.personId } })} className="text-primary text-sm font-medium min-h-tap py-1 px-2" title="Reach out">Reach out</button>
-                        <button type="button" onClick={() => navigate('/hallway')} className="text-primary text-sm font-medium min-h-tap py-1 px-2" title="Schedule">Schedule</button>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => completeCustom(c.id)}
-                      className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap"
-                      title="Mark done"
-                    >
-                      <Check size={18} />
-                    </button>
-                  </div>
+              <li key={c.id} className="card flex items-center gap-2 py-2 px-3 rounded-xl border border-border">
+                <User size={18} className="text-muted shrink-0" />
+                <div className="flex-1 min-w-0">
+                  {c.personId ? (
+                    <Link to={`/contacts/person/${c.personId}`} className="font-medium min-h-tap no-underline text-inherit block truncate">
+                      {c.label}
+                    </Link>
+                  ) : (
+                    <span className="font-medium block truncate">{c.label}</span>
+                  )}
+                  {(c.notes || c.targetDay) && (
+                    <span className="text-muted text-sm block truncate">
+                      {[c.targetDay ? `Target: ${c.targetDay.replace(/-/g, '/')}` : null, c.notes].filter(Boolean).join(' · ')}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button type="button" onClick={(e) => scheduleMenu === `custom-${c.id}` ? closeScheduleMenu() : openScheduleMenu(`custom-${c.id}`, e)} className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap" title="Schedule or reach out"><Calendar size={18} /></button>
+                  <button type="button" onClick={() => completeCustom(c.id)} className="p-2 rounded-lg text-accent hover:bg-accent/10 min-h-tap" title="Mark done"><Check size={18} /></button>
                 </div>
               </li>
             ))}
@@ -395,15 +475,7 @@ export function InterviewsToGet() {
                               </Link>
                               <span className="text-muted text-sm shrink-0">{reasonLabel(item)}</span>
                               <div className="flex items-center gap-1 shrink-0">
-                                <div className="relative">
-                                  <button type="button" onClick={() => setScheduleMenu(scheduleMenu === `y-${item.person.id}-${item.reason}` ? null : `y-${item.person.id}-${item.reason}`)} className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap" title="Schedule or reach out"><Calendar size={18} /></button>
-                                  {scheduleMenu === `y-${item.person.id}-${item.reason}` && (
-                                    <div className="absolute right-0 top-full mt-1 py-1 bg-white border border-border rounded-lg shadow-lg z-10 min-w-[140px]">
-                                      <button type="button" onClick={() => openReachOut({ kind: 'youth', item })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Reach out</button>
-                                      <button type="button" onClick={() => scheduleCalendar({ kind: 'youth', item })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Schedule</button>
-                                    </div>
-                                  )}
-                                </div>
+                                <button type="button" onClick={(e) => scheduleMenu === `y-${item.person.id}-${item.reason}` ? closeScheduleMenu() : openScheduleMenu(`y-${item.person.id}-${item.reason}`, e)} className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap" title="Schedule or reach out"><Calendar size={18} /></button>
                                 <button type="button" onClick={() => completeYouth(item)} className="p-2 rounded-lg text-accent hover:bg-accent/10 min-h-tap" title="Mark complete"><Check size={18} /></button>
                                 <button type="button" onClick={() => clearYouth(item)} className="p-2 rounded-lg text-muted hover:bg-slate-100 min-h-tap" title="Clear (won&apos;t happen)"><X size={18} /></button>
                               </div>
@@ -419,6 +491,28 @@ export function InterviewsToGet() {
             {filteredYouth.length === 0 && <p className="text-muted text-sm">None or all dismissed.</p>}
           </div>
         )}
+        {(() => {
+          const dismissedYouth = youthDue.filter((item) => dismissals.has(`${item.person.id}-${item.reason}`));
+          if (dismissedYouth.length === 0) return null;
+          return (
+            <>
+              <button type="button" onClick={() => setDismissedYouthCollapsed(!dismissedYouthCollapsed)} className="w-full flex items-center justify-between gap-2 py-2 px-0 mt-3 bg-transparent border-0 text-left text-sm font-medium text-muted min-h-tap">
+                <span>Dismissed ({dismissedYouth.length})</span>
+                {dismissedYouthCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+              </button>
+              {!dismissedYouthCollapsed && (
+                <ul className="list-none p-0 m-0 mt-2 space-y-1">
+                  {dismissedYouth.map((item) => (
+                    <li key={`${item.person.id}-${item.reason}`} className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-slate-50 border border-slate-100">
+                      <span className="flex-1 text-muted text-sm">{item.person.nameListPreferred} – {reasonLabel(item)}</span>
+                      <button type="button" onClick={() => addBackYouth(item)} className="text-primary text-sm font-medium min-h-tap py-1 px-2 rounded hover:bg-primary/10">Add back</button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          );
+        })()}
       </Section>
 
       <Section heading="Advancement (priesthood)">
@@ -430,24 +524,7 @@ export function InterviewsToGet() {
               </Link>
               <span className="text-muted text-sm shrink-0">{c.office} (turning {c.turningAge})</span>
               <div className="flex items-center gap-1 shrink-0">
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setScheduleMenu(scheduleMenu === `adv-${c.person.id}-${c.office}` ? null : `adv-${c.person.id}-${c.office}`)}
-                    className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap"
-                    title="Schedule or reach out"
-                    aria-label="Schedule or reach out"
-                  >
-                    <Calendar size={18} />
-                  </button>
-                  {scheduleMenu === `adv-${c.person.id}-${c.office}` && (
-                    <div className="absolute right-0 top-full mt-1 py-1 bg-white border border-border rounded-lg shadow-lg z-10 min-w-[140px]">
-                      <button type="button" onClick={() => openReachOut({ kind: 'advancement', candidate: c })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Reach out</button>
-                      <button type="button" onClick={() => scheduleCalendar({ kind: 'advancement', candidate: c })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Schedule</button>
-                      <button type="button" onClick={() => clearAdvancement(c)} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 text-muted">Clear (won&apos;t happen)</button>
-                    </div>
-                  )}
-                </div>
+                <button type="button" onClick={(e) => scheduleMenu === `adv-${c.person.id}-${c.office}` ? closeScheduleMenu() : openScheduleMenu(`adv-${c.person.id}-${c.office}`, e)} className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap" title="Schedule or reach out" aria-label="Schedule or reach out"><Calendar size={18} /></button>
                 <button type="button" onClick={() => completeAdvancement(c)} className="p-2 rounded-lg text-accent hover:bg-accent/10 min-h-tap" title="Mark complete"><Check size={18} /></button>
                 <button type="button" onClick={() => clearAdvancement(c)} className="p-2 rounded-lg text-muted hover:bg-slate-100 min-h-tap" title="Clear"><X size={18} /></button>
               </div>
@@ -455,6 +532,24 @@ export function InterviewsToGet() {
           ))}
         </ul>
         {advancement.length === 0 && <p className="text-muted text-sm">None.</p>}
+        {dismissedAdvancement.length > 0 && (
+          <>
+            <button type="button" onClick={() => setDismissedAdvCollapsed(!dismissedAdvCollapsed)} className="w-full flex items-center justify-between gap-2 py-2 px-0 mt-3 bg-transparent border-0 text-left text-sm font-medium text-muted min-h-tap">
+              <span>Dismissed ({dismissedAdvancement.length})</span>
+              {dismissedAdvCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+            </button>
+            {!dismissedAdvCollapsed && (
+              <ul className="list-none p-0 m-0 mt-2 space-y-1">
+                {dismissedAdvancement.map(({ candidate, dismissalId }) => (
+                  <li key={dismissalId} className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-slate-50 border border-slate-100">
+                    <span className="flex-1 text-muted text-sm">{candidate.person.nameListPreferred} – {candidate.office}</span>
+                    <button type="button" onClick={() => addBackAdvancement(dismissalId)} className="text-primary text-sm font-medium min-h-tap py-1 px-2 rounded hover:bg-primary/10">Add back</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
       </Section>
 
       <Section heading="Baptism (8th birthday)">
@@ -466,16 +561,7 @@ export function InterviewsToGet() {
               </Link>
               <span className="text-muted text-sm shrink-0">{c.eighthBirthday}</span>
               <div className="flex items-center gap-1 shrink-0">
-                <div className="relative">
-                  <button type="button" onClick={() => setScheduleMenu(scheduleMenu === `bap-${c.person.id}` ? null : `bap-${c.person.id}`)} className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap" title="Schedule or reach out"><Calendar size={18} /></button>
-                  {scheduleMenu === `bap-${c.person.id}` && (
-                    <div className="absolute right-0 top-full mt-1 py-1 bg-white border border-border rounded-lg shadow-lg z-10 min-w-[140px]">
-                      <button type="button" onClick={() => openReachOut({ kind: 'baptism', candidate: c })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Reach out</button>
-                      <button type="button" onClick={() => scheduleCalendar({ kind: 'baptism', candidate: c })} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Schedule</button>
-                      <button type="button" onClick={() => clearBaptism(c)} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 text-muted">Clear (won&apos;t happen)</button>
-                    </div>
-                  )}
-                </div>
+                <button type="button" onClick={(e) => scheduleMenu === `bap-${c.person.id}` ? closeScheduleMenu() : openScheduleMenu(`bap-${c.person.id}`, e)} className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap" title="Schedule or reach out"><Calendar size={18} /></button>
                 <button type="button" onClick={() => completeBaptism(c)} className="p-2 rounded-lg text-accent hover:bg-accent/10 min-h-tap" title="Mark complete"><Check size={18} /></button>
                 <button type="button" onClick={() => clearBaptism(c)} className="p-2 rounded-lg text-muted hover:bg-slate-100 min-h-tap" title="Clear"><X size={18} /></button>
               </div>
@@ -483,11 +569,96 @@ export function InterviewsToGet() {
           ))}
         </ul>
         {baptism.length === 0 && <p className="text-muted text-sm">None.</p>}
+        {dismissedBaptism.length > 0 && (
+          <>
+            <button type="button" onClick={() => setDismissedBapCollapsed(!dismissedBapCollapsed)} className="w-full flex items-center justify-between gap-2 py-2 px-0 mt-3 bg-transparent border-0 text-left text-sm font-medium text-muted min-h-tap">
+              <span>Dismissed ({dismissedBaptism.length})</span>
+              {dismissedBapCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+            </button>
+            {!dismissedBapCollapsed && (
+              <ul className="list-none p-0 m-0 mt-2 space-y-1">
+                {dismissedBaptism.map(({ candidate, dismissalId }) => (
+                  <li key={dismissalId} className="flex items-center gap-2 py-1.5 px-2 rounded-lg bg-slate-50 border border-slate-100">
+                    <span className="flex-1 text-muted text-sm">{candidate.person.nameListPreferred}</span>
+                    <button type="button" onClick={() => addBackBaptism(dismissalId)} className="text-primary text-sm font-medium min-h-tap py-1 px-2 rounded hover:bg-primary/10">Add back</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </>
+        )}
       </Section>
 
-      {reachOutTarget && (
+      {scheduleMenu && scheduleMenuAnchor && createPortal(
+        <div className="fixed inset-0 z-40" onClick={closeScheduleMenu} aria-hidden>
+          <div
+            className="fixed py-1 bg-white border border-border rounded-lg shadow-lg z-50 min-w-[140px]"
+            style={{ top: scheduleMenuAnchor.top, left: scheduleMenuAnchor.left }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {scheduleMenu.startsWith('y-') && (() => {
+              const parts = scheduleMenu.split('-');
+              const personId = parts[1];
+              const reason = parts.slice(2).join('-');
+              const item = filteredYouth.find((i) => i.person.id === personId && i.reason === reason);
+              if (!item) return null;
+              return (
+                <>
+                  <button type="button" onClick={() => { closeScheduleMenu(); openReachOut({ kind: 'youth', item }); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Reach out</button>
+                  <button type="button" onClick={() => { closeScheduleMenu(); scheduleCalendar({ kind: 'youth', item }); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Schedule</button>
+                </>
+              );
+            })()}
+            {scheduleMenu.startsWith('adv-') && (() => {
+              const [, personId, office] = scheduleMenu.split('-');
+              const c = advancement.find((x) => x.person.id === personId && x.office === office);
+              if (!c) return null;
+              return (
+                <>
+                  <button type="button" onClick={() => { closeScheduleMenu(); openReachOut({ kind: 'advancement', candidate: c }); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Reach out</button>
+                  <button type="button" onClick={() => { closeScheduleMenu(); scheduleCalendar({ kind: 'advancement', candidate: c }); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Schedule</button>
+                  <button type="button" onClick={() => { closeScheduleMenu(); clearAdvancement(c); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 text-muted">Clear (won&apos;t happen)</button>
+                </>
+              );
+            })()}
+            {scheduleMenu.startsWith('bap-') && (() => {
+              const personId = scheduleMenu.replace('bap-', '');
+              const c = baptism.find((x) => x.person.id === personId);
+              if (!c) return null;
+              return (
+                <>
+                  <button type="button" onClick={() => { closeScheduleMenu(); openReachOut({ kind: 'baptism', candidate: c }); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Reach out</button>
+                  <button type="button" onClick={() => { closeScheduleMenu(); scheduleCalendar({ kind: 'baptism', candidate: c }); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Schedule</button>
+                  <button type="button" onClick={() => { closeScheduleMenu(); clearBaptism(c); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50 text-muted">Clear (won&apos;t happen)</button>
+                </>
+              );
+            })()}
+            {scheduleMenu.startsWith('custom-') && (() => {
+              const id = scheduleMenu.replace('custom-', '');
+              const c = custom.find((x) => x.id === id);
+              if (!c) return null;
+              return (
+                <>
+                  <button type="button" onClick={() => { openReachOutCustom(c); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Reach out</button>
+                  <button type="button" onClick={() => { closeScheduleMenu(); scheduleCalendar({ kind: 'custom', item: c, person: null }); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-slate-50">Schedule</button>
+                </>
+              );
+            })()}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {reachOutTarget && reachOutTarget.kind === 'custom' && !reachOutTarget.person && (
+        <PeoplePickerModal
+          onSelect={(p) => pickRecipientForReachOut(p)}
+          onClose={() => setReachOutTarget(null)}
+          filter={(p) => !p.doNotInterview && !p.inactive}
+        />
+      )}
+      {reachOutTarget && (reachOutTarget.kind !== 'custom' || reachOutTarget.person) && (
         <RecipientPickerModal
-          person={reachOutTarget.kind === 'advancement' ? reachOutTarget.candidate.person : reachOutTarget.kind === 'baptism' ? reachOutTarget.candidate.person : reachOutTarget.item.person}
+          person={reachOutTarget.kind === 'advancement' ? reachOutTarget.candidate.person : reachOutTarget.kind === 'baptism' ? reachOutTarget.candidate.person : reachOutTarget.kind === 'youth' ? reachOutTarget.item.person : reachOutTarget.person!}
           onSelect={(p) => pickRecipientForReachOut(p)}
           onClose={() => setReachOutTarget(null)}
         />

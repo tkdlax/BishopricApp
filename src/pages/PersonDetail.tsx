@@ -3,8 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import { db } from '../db/schema';
 import { PageLayout } from '../components/ui';
 import { normalizeName } from '../lib/nameUtils';
-import type { Person as PersonType, Household } from '../db/schema';
-import { User, Phone, Mail, Home, Calendar, Edit2 } from 'lucide-react';
+import type { Person as PersonType, Household, PrayerHistoryRecord } from '../db/schema';
+import { User, Phone, Mail, Home, Calendar, Edit2, BookOpen } from 'lucide-react';
 
 export function PersonDetail() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +21,7 @@ export function PersonDetail() {
   const [doNotInterview, setDoNotInterview] = useState(false);
   const [doNotAskForPrayer, setDoNotAskForPrayer] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [prayerHistory, setPrayerHistory] = useState<PrayerHistoryRecord[]>([]);
 
   useEffect(() => {
     if (!id) return;
@@ -38,6 +39,9 @@ export function PersonDetail() {
         setDoNotInterview(!!p.doNotInterview);
         setDoNotAskForPrayer(!!p.doNotAskForPrayer);
         db.households.get(p.householdId).then((h) => setHousehold(h ?? null));
+        db.prayerHistory.where('personId').equals(p.id).toArray().then((list) => {
+          setPrayerHistory(list.sort((a, b) => (b.localDate > a.localDate ? 1 : b.localDate < a.localDate ? -1 : 0)));
+        });
       }
     });
   }, [id]);
@@ -99,6 +103,29 @@ export function PersonDetail() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Prayer in sacrament */}
+      <div className="card p-4 mb-4">
+        <div className="flex items-center gap-2 text-muted text-sm font-medium mb-3">
+          <BookOpen size={18} className="text-accent shrink-0" />
+          Prayer in sacrament
+        </div>
+        {prayerHistory.length === 0 ? (
+          <p className="text-muted text-sm">No sacrament prayer recorded.</p>
+        ) : (
+          <div className="space-y-1">
+            <p className="text-slate-700 text-sm font-medium">Last prayer: {prayerHistory[0]!.localDate.replace(/-/g, '/')} ({prayerHistory[0]!.prayerType === 'opening' ? 'Opening' : 'Closing'})</p>
+            {prayerHistory.length > 1 && (
+              <ul className="list-none p-0 m-0 text-muted text-sm">
+                {prayerHistory.slice(1, 11).map((r) => (
+                  <li key={r.id}>{r.localDate.replace(/-/g, '/')} – {r.prayerType === 'opening' ? 'Opening' : 'Closing'}</li>
+                ))}
+                {prayerHistory.length > 11 && <li>…and {prayerHistory.length - 11} more</li>}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Contact */}

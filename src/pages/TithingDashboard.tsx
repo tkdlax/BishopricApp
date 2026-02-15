@@ -17,6 +17,8 @@ export function TithingDashboard() {
   const [newCampaignName, setNewCampaignName] = useState('');
   const [newStart, setNewStart] = useState('');
   const [newEnd, setNewEnd] = useState('');
+  const [customMessage, setCustomMessage] = useState('');
+  const [customMessageStatus, setCustomMessageStatus] = useState<string | null>(null);
 
   useEffect(() => {
     db.campaigns.toArray().then(setCampaigns);
@@ -67,9 +69,11 @@ export function TithingDashboard() {
     setStatuses((prev) => ({ ...prev, [householdId]: status }));
   }
 
+  const includedHouseholds = households.filter((h) => !h.excludeFromTithingDeclaration);
+
   async function batchInvite() {
     if (!selectedCampaignId) return;
-    const notContacted = households.filter((h) => (statuses[h.id] ?? 'not_contacted') === 'not_contacted');
+    const notContacted = includedHouseholds.filter((h) => (statuses[h.id] ?? 'not_contacted') === 'not_contacted');
     const now = Date.now();
     for (const h of notContacted) {
       const peopleInHh = await db.people.where('householdId').equals(h.id).toArray();
@@ -88,6 +92,35 @@ export function TithingDashboard() {
       });
       await setStatus(h.id, 'invited');
     }
+  }
+
+  async function sendCustomToNotCompleted() {
+    if (!selectedCampaignId || !customMessage.trim()) {
+      setCustomMessageStatus('Enter a message first.');
+      return;
+    }
+    const notCompleted = includedHouseholds.filter((h) => (statuses[h.id] ?? 'not_contacted') !== 'completed');
+    let sent = 0;
+    const now = Date.now();
+    for (const h of notCompleted) {
+      const peopleInHh = await db.people.where('householdId').equals(h.id).toArray();
+      const withPhone = peopleInHh.filter((p) => p.phones?.length);
+      const first = withPhone[0] as Person | undefined;
+      if (!first?.phones?.[0]) continue;
+      await db.messageQueue.add({
+        id: `mq-${now}-${h.id}-${Math.random().toString(36).slice(2, 9)}`,
+        recipientPhone: first.phones[0],
+        renderedMessage: customMessage.trim(),
+        relatedObjectType: 'tithing',
+        relatedObjectId: selectedCampaignId,
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now,
+      });
+      sent++;
+    }
+    setCustomMessageStatus(`Added ${sent} message(s) to the queue.`);
+    setTimeout(() => setCustomMessageStatus(null), 4000);
   }
 
   const selectedCampaign = campaigns.find((c) => c.id === selectedCampaignId);
@@ -130,11 +163,25 @@ export function TithingDashboard() {
             <button type="button" onClick={batchInvite} className="mb-4 border border-border rounded-lg px-4 py-2.5 font-medium min-h-tap">
               Batch invite (not contacted → queue)
             </button>
-            {households.length === 0 ? (
-              <EmptyState message="No households." />
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-muted mb-1">Custom message to those who haven&apos;t finished</label>
+              <textarea
+                value={customMessage}
+                onChange={(e) => setCustomMessage(e.target.value)}
+                placeholder="Enter your message…"
+                rows={3}
+                className={`${inputClass} resize-y`}
+              />
+              <button type="button" onClick={sendCustomToNotCompleted} disabled={!customMessage.trim()} className="mt-2 border border-border rounded-lg px-4 py-2.5 font-medium min-h-tap disabled:opacity-50">
+                Send to all not completed
+              </button>
+              {customMessageStatus && <p className="text-sm text-muted mt-2">{customMessageStatus}</p>}
+            </div>
+            {includedHouseholds.length === 0 ? (
+              <EmptyState message="No households (or all excluded from tithing declaration)." />
             ) : (
               <ul className="space-y-2 list-none p-0 m-0">
-                {households.map((h) => (
+                {includedHouseholds.map((h) => (
                   <li key={h.id} className="flex items-center justify-between gap-2 py-2 border-b border-border last:border-0">
                     <span className="font-medium">{h.name}</span>
                     <select

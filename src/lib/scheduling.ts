@@ -86,6 +86,7 @@ export function buildSlotMinutes(startMinutes: number, endMinutes: number, inter
 export const INTERVIEW_SLOT_START_KEY = 'interviewSlotStart';
 export const INTERVIEW_SLOT_END_KEY = 'interviewSlotEnd';
 export const INTERVIEW_SLOT_INTERVAL_KEY = 'interviewSlotInterval';
+export const EXCLUDE_OCCUPIED_SLOTS_KEY = 'excludeOccupiedSlots';
 
 const DEFAULT_INTERVIEW_START = 14 * 60;
 const DEFAULT_INTERVIEW_END = 16 * 60;
@@ -121,11 +122,37 @@ export interface SlotInfo {
   taken: boolean;
 }
 
+export interface OccupiedRange {
+  startMinutes: number;
+  endMinutes: number;
+}
+
+const DEFAULT_TEMPLATE_ID = 'schedule-monthly-sunday';
+
+/** Load day blocks and recurring items for a date (with exceptions) and return time ranges that are occupied. */
+export async function getOccupiedRangesForDate(localDate: string): Promise<OccupiedRange[]> {
+  const week = getWeekOfMonth(localDate);
+  const [dayBlocks, recurring, exceptions] = await Promise.all([
+    db.dayBlocks.where('localDate').equals(localDate).toArray(),
+    db.recurringScheduleItems.where('templateId').equals(DEFAULT_TEMPLATE_ID).toArray(),
+    db.scheduleItemExceptions.where('templateId').equals(DEFAULT_TEMPLATE_ID).toArray(),
+  ]);
+  const exceptionItemIds = new Set(exceptions.filter((e) => e.localDate === localDate).map((e) => e.itemId));
+  const ranges: OccupiedRange[] = dayBlocks.map((b) => ({ startMinutes: b.startMinutes, endMinutes: b.endMinutes }));
+  for (const r of recurring) {
+    if (exceptionItemIds.has(r.id)) continue;
+    if (r.weekOfMonth !== 0 && r.weekOfMonth !== week) continue;
+    ranges.push({ startMinutes: r.startMinutes, endMinutes: r.endMinutes });
+  }
+  return ranges;
+}
+
 export async function getSlotsForDate(
   localDate: string,
   appointments: { localDate: string; minutesFromMidnight: number; durationMinutes?: number }[],
   blackouts: string[],
-  slotMinutes: number[]
+  slotMinutes: number[],
+  occupiedRanges?: OccupiedRange[]
 ): Promise<SlotInfo[]> {
   if (blackouts.includes(localDate)) return [];
   const taken = new Set<number>();
@@ -134,6 +161,13 @@ export async function getSlotsForDate(
     const dur = a.durationMinutes ?? 20;
     for (let m = a.minutesFromMidnight; m < a.minutesFromMidnight + dur; m += 15) {
       taken.add(m);
+    }
+  }
+  if (occupiedRanges) {
+    for (const r of occupiedRanges) {
+      for (let m = r.startMinutes; m < r.endMinutes; m += 15) {
+        taken.add(m);
+      }
     }
   }
   return slotMinutes.map((minutesFromMidnight) => {

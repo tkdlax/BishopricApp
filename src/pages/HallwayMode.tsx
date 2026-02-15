@@ -4,11 +4,14 @@ import { PageLayout, Section } from '../components/ui';
 import {
   getSlotsForDate,
   getInterviewSlotMinutes,
+  getOccupiedRangesForDate,
   upcomingSunday,
   todayLocalDate,
   addDays,
   formatTimeAmPm,
+  EXCLUDE_OCCUPIED_SLOTS_KEY,
 } from '../lib/scheduling';
+import { db } from '../db/schema';
 import { getBlackoutDates } from '../lib/blackouts';
 import { formatSundayLabel } from '../lib/monthInterviews';
 import { PeoplePickerModal } from '../components/PeoplePickerModal';
@@ -50,18 +53,22 @@ export function HallwayMode() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [slotMinutes, blackouts, apptsThis, apptsNext] = await Promise.all([
+      const [slotMinutes, blackouts, apptsThis, apptsNext, excludeSetting, occupiedThis, occupiedNext] = await Promise.all([
         getInterviewSlotMinutes(),
         getBlackoutDates(),
         db.appointments.where('localDate').equals(thisSunday).toArray(),
         db.appointments.where('localDate').equals(nextSun).toArray(),
+        db.settings.get(EXCLUDE_OCCUPIED_SLOTS_KEY),
+        getOccupiedRangesForDate(thisSunday),
+        getOccupiedRangesForDate(nextSun),
       ]);
       if (cancelled) return;
-      const toSlots = (localDate: string, list: { minutesFromMidnight: number; durationMinutes?: number }[]) =>
-        getSlotsForDate(localDate, list.map((a) => ({ ...a, localDate })), blackouts, slotMinutes);
+      const excludeOccupied = typeof excludeSetting?.value === 'boolean' ? excludeSetting.value : true;
+      const toSlots = (localDate: string, list: { minutesFromMidnight: number; durationMinutes?: number }[], occupied: { startMinutes: number; endMinutes: number }[]) =>
+        getSlotsForDate(localDate, list.map((a) => ({ ...a, localDate })), blackouts, slotMinutes, excludeOccupied ? occupied : undefined);
       const [sThis, sNext] = await Promise.all([
-        toSlots(thisSunday, apptsThis),
-        toSlots(nextSun, apptsNext),
+        toSlots(thisSunday, apptsThis, occupiedThis),
+        toSlots(nextSun, apptsNext, occupiedNext),
       ]);
       if (cancelled) return;
       setSlotsThis(sThis);

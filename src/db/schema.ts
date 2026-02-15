@@ -17,6 +17,8 @@ export interface Household {
   name: string;
   addressFormatted?: string;
   defaultContactPreference?: DefaultContactPreference;
+  /** Exclude from tithing declaration list (e.g. will never attend). */
+  excludeFromTithingDeclaration?: boolean;
   notes?: string;
   createdAt: number;
   updatedAt: number;

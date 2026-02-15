@@ -21,6 +21,7 @@ import { PrayerDashboard } from './pages/PrayerDashboard';
 import { BackupRestore } from './pages/BackupRestore';
 import { TemplateEditor } from './pages/TemplateEditor';
 import { QueueRunnerModal } from './components/QueueRunnerModal';
+import { runReminderQueueIfNeeded } from './lib/reminderQueue';
 
 function AppointmentDetailPage() {
   return <AppointmentDetail />;
@@ -42,6 +43,10 @@ function AppShell() {
     if (orient?.lock) {
       orient.lock('portrait').catch(() => {});
     }
+  }, []);
+
+  useEffect(() => {
+    runReminderQueueIfNeeded().catch(() => {});
   }, []);
 
   useEffect(() => {

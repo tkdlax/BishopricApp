@@ -12,10 +12,20 @@ export function openSms(phone: string, body: string): void {
   window.location.href = url;
 }
 
-export function buildWhatsAppUrl(phone: string, body: string): string {
+/** Normalize phone to digits; if 10 digits assume US and prepend 1 for wa.me. */
+export function normalizePhoneForWhatsApp(phone: string): string {
   const cleaned = phone.replace(/\D/g, '');
-  const encoded = encodeURIComponent(body);
-  return `https://wa.me/${cleaned}${body ? `?text=${encoded}` : ''}`;
+  if (cleaned.length === 10) return `1${cleaned}`;
+  return cleaned;
+}
+
+const MAX_WHATSAPP_URL_BODY = 1500;
+
+export function buildWhatsAppUrl(phone: string, body: string): string {
+  const cleaned = normalizePhoneForWhatsApp(phone);
+  const truncated = body.length > MAX_WHATSAPP_URL_BODY ? body.slice(0, MAX_WHATSAPP_URL_BODY) + '…' : body;
+  const encoded = encodeURIComponent(truncated);
+  return `https://wa.me/${cleaned}${encoded ? `?text=${encoded}` : ''}`;
 }
 
 export function openWhatsApp(phone: string, body: string): void {

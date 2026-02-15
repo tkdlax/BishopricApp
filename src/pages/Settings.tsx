@@ -8,6 +8,7 @@ import {
   INTERVIEW_SLOT_START_KEY,
   INTERVIEW_SLOT_END_KEY,
   INTERVIEW_SLOT_INTERVAL_KEY,
+  EXCLUDE_OCCUPIED_SLOTS_KEY,
   minutesToTime,
 } from '../lib/scheduling';
 import { PeoplePickerModal } from '../components/PeoplePickerModal';
@@ -33,6 +34,7 @@ export function Settings() {
   const [slotStart, setSlotStart] = useState(DEFAULT_SLOT_START);
   const [slotEnd, setSlotEnd] = useState(DEFAULT_SLOT_END);
   const [slotInterval, setSlotInterval] = useState(DEFAULT_SLOT_INTERVAL);
+  const [excludeOccupiedSlots, setExcludeOccupiedSlots] = useState(true);
 
   useEffect(() => {
     getBishopPerson().then(setBishopPerson);
@@ -43,10 +45,12 @@ export function Settings() {
       db.settings.get(INTERVIEW_SLOT_START_KEY),
       db.settings.get(INTERVIEW_SLOT_END_KEY),
       db.settings.get(INTERVIEW_SLOT_INTERVAL_KEY),
-    ]).then(([s, e, i]) => {
+      db.settings.get(EXCLUDE_OCCUPIED_SLOTS_KEY),
+    ]).then(([s, e, i, ex]) => {
       if (typeof s?.value === 'number') setSlotStart(minutesToTime(s.value));
       if (typeof e?.value === 'number') setSlotEnd(minutesToTime(e.value));
       if (typeof i?.value === 'number') setSlotInterval(i.value);
+      setExcludeOccupiedSlots(typeof ex?.value === 'boolean' ? ex.value : true);
     });
   }, []);
 
@@ -121,7 +125,7 @@ export function Settings() {
     <PageLayout back="auto" title="Settings">
       <Section heading="Bishop (for messages)">
         <div className={cardClass}>
-          <p className="text-sm text-muted mb-2">Used in reach-out messages: &quot;on behalf of bishop [last name]&quot;.</p>
+          <p className="text-sm text-muted mb-2">Used in reach-out messages: &quot;on behalf of bishop [last name]&quot;. For &quot;Send day to Bishop&quot; via WhatsApp, include country code on the bishop&apos;s contact phone (e.g. 1 for US).</p>
           <p className="mb-2">Bishop: {bishopPerson ? bishopPerson.nameListPreferred : 'Not set'}</p>
           <div className="flex gap-2">
             <button type="button" onClick={() => setShowBishopPicker(true)} className="bg-primary text-white px-4 py-2.5 rounded-lg font-semibold min-h-tap">
@@ -171,6 +175,20 @@ export function Settings() {
                 onChange={(e) => setSlotInterval(parseInt(e.target.value, 10) || DEFAULT_SLOT_INTERVAL)}
                 className="border border-border rounded-xl px-3 py-2.5 w-full max-w-[120px] focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               />
+            </label>
+            <label className="flex items-center gap-3 py-2 min-h-tap cursor-pointer">
+              <input
+                type="checkbox"
+                checked={excludeOccupiedSlots}
+                onChange={(e) => {
+                  const v = e.target.checked;
+                  setExcludeOccupiedSlots(v);
+                  const now = Date.now();
+                  db.settings.put({ id: EXCLUDE_OCCUPIED_SLOTS_KEY, value: v, updatedAt: now });
+                }}
+                className="rounded border-border text-primary focus:ring-primary/40 w-5 h-5"
+              />
+              <span className="text-slate-700">Don&apos;t suggest times that are already used (recurring/custom events)</span>
             </label>
           </div>
           <button type="button" onClick={saveSlotWindow} className="bg-primary text-white px-4 py-2.5 rounded-xl font-semibold min-h-tap hover:opacity-95 active:opacity-90 transition-opacity">

@@ -13,6 +13,7 @@ export function HouseholdDetail() {
   const [members, setMembers] = useState<{ id: string; name: string }[]>([]);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [excludeFromTithingDeclaration, setExcludeFromTithingDeclaration] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export function HouseholdDetail() {
       if (h) {
         setName(h.name);
         setAddress(h.addressFormatted ?? '');
+        setExcludeFromTithingDeclaration(!!h.excludeFromTithingDeclaration);
       }
     });
     db.people.where('householdId').equals(id).toArray().then((list) => {
@@ -61,9 +63,10 @@ export function HouseholdDetail() {
     await db.households.update(household.id, {
       name: name.trim(),
       addressFormatted: address.trim() || undefined,
+      excludeFromTithingDeclaration,
       updatedAt: now,
     });
-    setHousehold((prev) => prev ? { ...prev, name: name.trim(), addressFormatted: address.trim() || undefined, updatedAt: now } : null);
+    setHousehold((prev) => prev ? { ...prev, name: name.trim(), addressFormatted: address.trim() || undefined, excludeFromTithingDeclaration, updatedAt: now } : null);
     setSaving(false);
   };
 
@@ -115,6 +118,19 @@ export function HouseholdDetail() {
           rows={3}
         />
       </Section>
+      {!isNew && (
+        <Section heading="Tithing declaration">
+          <label className="flex items-center gap-3 py-2 min-h-tap cursor-pointer">
+            <input
+              type="checkbox"
+              checked={excludeFromTithingDeclaration}
+              onChange={(e) => setExcludeFromTithingDeclaration(e.target.checked)}
+              className="rounded border-border text-primary focus:ring-primary/40 w-5 h-5"
+            />
+            <span className="text-slate-700">Exclude from tithing declaration (e.g. will never attend)</span>
+          </label>
+        </Section>
+      )}
       <div className="mb-6">
         <button
           type="button"
