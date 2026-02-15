@@ -35,7 +35,7 @@ export async function runReminderQueueIfNeeded(): Promise<void> {
     db.recurringScheduleItems
       .where('templateId')
       .equals(DEFAULT_TEMPLATE_ID)
-      .filter((item) => (item.reminderDaysBefore ?? 0) > 0 && item.reminderRecipientKind && item.reminderRecipientKind !== 'none')
+      .filter((item) => Boolean((item.reminderDaysBefore ?? 0) > 0 && item.reminderRecipientKind && item.reminderRecipientKind !== 'none'))
       .toArray(),
     db.scheduleItemExceptions.where('templateId').equals(DEFAULT_TEMPLATE_ID).toArray(),
   ]);

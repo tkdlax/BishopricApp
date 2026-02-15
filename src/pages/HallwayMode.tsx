@@ -11,7 +11,6 @@ import {
   formatTimeAmPm,
   EXCLUDE_OCCUPIED_SLOTS_KEY,
 } from '../lib/scheduling';
-import { db } from '../db/schema';
 import { getBlackoutDates } from '../lib/blackouts';
 import { formatSundayLabel } from '../lib/monthInterviews';
 import { PeoplePickerModal } from '../components/PeoplePickerModal';
