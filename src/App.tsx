@@ -126,7 +126,7 @@ function AppShell() {
       </main>
       {showNav && (
         <nav
-          className="fixed bottom-0 left-0 right-0 flex justify-around items-center bg-primary text-white shrink-0 shadow-[0_-1px_6px_rgba(0,0,0,0.08)]"
+          className="fixed bottom-0 left-0 right-0 z-30 flex justify-around items-center bg-primary text-white shrink-0 shadow-[0_-1px_6px_rgba(0,0,0,0.08)]"
           style={{ paddingTop: '0.5rem', paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
         >
           {navItems.map(({ path, label, Icon }) => (
