@@ -235,12 +235,14 @@ export interface InterviewToGetNote {
   updatedAt: number;
 }
 
-/** User-added custom "interview to get" item. */
+/** User-added custom "interview to get" item. Free-form until you reach out or schedule. */
 export interface CustomInterviewToGet {
   id: string;
   personId?: string;
   label: string;
   notes?: string;
+  /** Optional target date for the interview (YYYY-MM-DD). */
+  targetDay?: string;
   createdAt: number;
   completedAt?: number;
 }

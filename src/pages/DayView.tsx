@@ -17,6 +17,9 @@ import { getMessageRecipientPhone, isUnder18 } from '../lib/contactRecipient';
 import { RecipientPickerModal } from '../components/RecipientPickerModal';
 import { getLocationSuffix } from '../lib/templates';
 import { REACH_OUT_INTERVIEW_TYPES, getMessageTextForType } from '../lib/reachOutTemplate';
+import { getBishopPerson } from '../lib/bishopForMessages';
+import { getDayScheduleText } from '../lib/dayScheduleExport';
+import { openSms, openWhatsApp } from '../lib/sms';
 
 const DURATION = 20;
 const INTERVIEW_KIND = REACH_OUT_INTERVIEW_TYPES[0]?.type ?? 'temple_recommend';
@@ -49,6 +52,8 @@ export function DayView() {
     localDate: string;
     minutesFromMidnight: number;
   } | null>(null);
+  const [sendToBishopDate, setSendToBishopDate] = useState(defaultDate);
+  const [sendToBishopError, setSendToBishopError] = useState<string | null>(null);
 
   const nextSun = nextSunday(today);
   const isThisSunday = selectedDate === defaultDate;
@@ -379,6 +384,58 @@ export function DayView() {
           Add other event
         </button>
       </div>
+
+      <Section heading="Send day to Bishop">
+        <div className="card p-4">
+          <p className="text-sm text-muted mb-3">Pre-filled message with the day&apos;s schedule (interviews, recurring meetings, custom events). Opens your messaging app or WhatsApp.</p>
+          <label className="block mb-3">
+            <span className="text-sm font-medium text-muted block mb-1">Date</span>
+            <input
+              type="date"
+              value={sendToBishopDate}
+              onChange={(e) => { setSendToBishopDate(e.target.value); setSendToBishopError(null); }}
+              className="border border-border rounded-xl px-3 py-2.5 w-full max-w-xs"
+            />
+          </label>
+          {sendToBishopError && <p className="text-red-600 text-sm mb-2">{sendToBishopError}</p>}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                setSendToBishopError(null);
+                const bishop = await getBishopPerson();
+                const phone = bishop?.phones?.[0];
+                if (!phone) {
+                  setSendToBishopError('Set Bishop in Settings and add a phone number for him.');
+                  return;
+                }
+                const body = await getDayScheduleText(sendToBishopDate);
+                openSms(phone, body);
+              }}
+              className="bg-primary text-white px-4 py-2.5 rounded-xl font-semibold min-h-tap"
+            >
+              Send via Text
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                setSendToBishopError(null);
+                const bishop = await getBishopPerson();
+                const phone = bishop?.phones?.[0];
+                if (!phone) {
+                  setSendToBishopError('Set Bishop in Settings and add a phone number for him.');
+                  return;
+                }
+                const body = await getDayScheduleText(sendToBishopDate);
+                openWhatsApp(phone, body);
+              }}
+              className="border-2 border-green-600 text-green-700 px-4 py-2.5 rounded-xl font-semibold min-h-tap hover:bg-green-50"
+            >
+              Send via WhatsApp
+            </button>
+          </div>
+        </div>
+      </Section>
 
       {slotPicker && (
         <PeoplePickerModal

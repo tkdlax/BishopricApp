@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { db } from '../db/schema';
 import { getMessageRecipientPhone, isUnder18 } from '../lib/contactRecipient';
 import { RecipientPickerModal } from '../components/RecipientPickerModal';
@@ -17,6 +17,7 @@ const inputClass = 'border border-border rounded-lg px-3 py-2 w-full';
 type Mode = 'chooser' | 'reach_out' | 'reach_out_done';
 
 export function ScheduleInterview() {
+  const location = useLocation();
   const [mode, setMode] = useState<Mode>('chooser');
   const [selectedPerson, setSelectedPerson] = useState<Person | null>(null);
   const [selectedTypeKey, setSelectedTypeKey] = useState<string>(REACH_OUT_INTERVIEW_TYPES[0]?.type ?? 'standard_interview');
@@ -24,6 +25,17 @@ export function ScheduleInterview() {
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showRecipientPicker, setShowRecipientPicker] = useState(false);
+
+  const personIdFromState = (location.state as { personId?: string } | null)?.personId;
+  useEffect(() => {
+    if (!personIdFromState) return;
+    db.people.get(personIdFromState).then((p) => {
+      if (p) {
+        setSelectedPerson(p);
+        setMode('reach_out');
+      }
+    });
+  }, [personIdFromState]);
 
   const interviewTypeDisplay = getMessageTextForType(selectedTypeKey);
 

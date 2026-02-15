@@ -10,7 +10,7 @@ import {
   type AdvancementCandidate,
   type BaptismCandidate,
 } from '../lib/youthInterviews';
-import { REACH_OUT_INTERVIEW_TYPES, buildReachOutMessage } from '../lib/reachOutTemplate';
+import { buildReachOutMessage } from '../lib/reachOutTemplate';
 import { getYouthReachOutBody } from '../lib/templates';
 import { getBishopLastNameForMessage } from '../lib/bishopForMessages';
 import { getHouseholdMembersWithPhones } from '../lib/contactRecipient';
@@ -31,13 +31,15 @@ export function InterviewsToGet() {
   const [youthDue, setYouthDue] = useState<YouthDueItem[]>([]);
   const [advancement, setAdvancement] = useState<AdvancementCandidate[]>([]);
   const [baptism, setBaptism] = useState<BaptismCandidate[]>([]);
-  const [custom, setCustom] = useState<{ id: string; label: string; personId?: string; completedAt?: number }[]>([]);
+  const [custom, setCustom] = useState<{ id: string; label: string; personId?: string; notes?: string; targetDay?: string; completedAt?: number }[]>([]);
   const [dismissals, setDismissals] = useState<Set<string>>(new Set());
   const [youthCollapsed, setYouthCollapsed] = useState(true);
   const [showAddCustom, setShowAddCustom] = useState(false);
   const [showPersonPicker, setShowPersonPicker] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [customNote, setCustomNote] = useState('');
+  const [customTargetDay, setCustomTargetDay] = useState('');
   const [customPerson, setCustomPerson] = useState<Person | null>(null);
-  const [customType, setCustomType] = useState(REACH_OUT_INTERVIEW_TYPES[0]?.type ?? 'temple_recommend');
   const [reachOutTarget, setReachOutTarget] = useState<ReachOutTarget | null>(null);
   const [scheduleMenu, setScheduleMenu] = useState<string | null>(null);
   const [bulkAddQueue, setBulkAddQueue] = useState<YouthDueItem[]>([]);
@@ -70,7 +72,7 @@ export function InterviewsToGet() {
     const bapDismissSet = new Set(bapDismissed.map((b) => b.personId));
     setAdvancement(getAdvancementCandidates(people).filter((c) => !advCompleted.has(`${c.person.id}-${c.office}`) && !advDismissSet.has(`${c.person.id}-${c.office}`)));
     setBaptism(getBaptismCandidates(people).filter((c) => !bapCompleted.has(c.person.id) && !bapDismissSet.has(c.person.id)));
-    setCustom(customList.map((c) => ({ id: c.id, label: c.label, personId: c.personId, completedAt: c.completedAt })));
+    setCustom(customList.map((c) => ({ id: c.id, label: c.label, personId: c.personId, notes: c.notes, targetDay: c.targetDay, completedAt: c.completedAt })));
     setDismissals(new Set(dismissList.map((d) => `${d.personId}-${d.reasonKey}`)));
     setYouthCompletions(youthCompleted);
   }
@@ -91,16 +93,20 @@ export function InterviewsToGet() {
   const monthsWithYouth = Object.keys(youthByMonthThenLeader).map(Number).sort((a, b) => a - b);
 
   async function addCustom() {
-    if (!customPerson) return;
-    const typeName = REACH_OUT_INTERVIEW_TYPES.find((t) => t.type === customType)?.name ?? 'Interview';
-    const label = `${customPerson.nameListPreferred} – ${typeName}`;
+    const name = customName.trim();
+    if (!name) return;
     const now = Date.now();
     await db.customInterviewToGet.add({
       id: `custom-${now}-${Math.random().toString(36).slice(2, 9)}`,
-      personId: customPerson.id,
-      label,
+      personId: customPerson?.id,
+      label: name,
+      notes: customNote.trim() || undefined,
+      targetDay: customTargetDay || undefined,
       createdAt: now,
     });
+    setCustomName('');
+    setCustomNote('');
+    setCustomTargetDay('');
     setCustomPerson(null);
     setShowAddCustom(false);
     load();
@@ -258,70 +264,89 @@ export function InterviewsToGet() {
       <Section heading="My checklist">
         <div className="card p-4 mb-3">
           {custom.length === 0 && !showAddCustom && (
-            <p className="text-muted text-sm mb-3">Add any person and interview type to track.</p>
+            <p className="text-muted text-sm mb-3">A running list of interviews to get. Add a name and note, optionally link a contact and set a target day. Reach out or schedule when you&apos;re ready.</p>
           )}
           <ul className="list-none p-0 m-0 space-y-2">
             {custom.map((c) => (
-              <li key={c.id} className="flex items-center gap-3 py-2 px-3 rounded-xl border border-border bg-white">
-                <span className="flex-1 font-medium min-w-0">{c.label}</span>
-                {c.personId && (
-                  <Link to={`/contacts/person/${c.personId}`} className="text-primary text-sm shrink-0">View</Link>
-                )}
-                <button
-                  type="button"
-                  onClick={() => completeCustom(c.id)}
-                  className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap"
-                  title="Mark done"
-                >
-                  <Check size={18} />
-                </button>
+              <li key={c.id} className="py-3 px-3 rounded-xl border border-border bg-white">
+                <div className="flex flex-wrap items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <span className="font-medium block">{c.label}</span>
+                    {c.notes && <p className="text-sm text-muted mt-0.5 mb-1 whitespace-pre-wrap">{c.notes}</p>}
+                    {c.targetDay && (
+                      <span className="text-xs text-muted">Target: {c.targetDay.replace(/-/g, '/')}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {c.personId && (
+                      <>
+                        <Link to={`/contacts/person/${c.personId}`} className="text-primary text-sm font-medium min-h-tap py-1 px-2">View</Link>
+                        <button type="button" onClick={() => navigate('/schedule', { state: { personId: c.personId } })} className="text-primary text-sm font-medium min-h-tap py-1 px-2" title="Reach out">Reach out</button>
+                        <button type="button" onClick={() => navigate('/hallway')} className="text-primary text-sm font-medium min-h-tap py-1 px-2" title="Schedule">Schedule</button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => completeCustom(c.id)}
+                      className="p-2 rounded-lg text-primary hover:bg-primary/10 min-h-tap"
+                      title="Mark done"
+                    >
+                      <Check size={18} />
+                    </button>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>
           {showAddCustom ? (
             <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-border">
               <p className="text-sm font-medium text-muted mb-2">Add to checklist</p>
-              <div className="flex flex-wrap gap-2 items-center mb-2">
+              <label className="block mb-2">
+                <span className="text-sm text-muted block mb-1">Name</span>
+                <input
+                  type="text"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="e.g. John Smith – temple recommend"
+                  className="border border-border rounded-lg px-3 py-2 w-full"
+                />
+              </label>
+              <label className="block mb-2">
+                <span className="text-sm text-muted block mb-1">Note (optional)</span>
+                <textarea
+                  value={customNote}
+                  onChange={(e) => setCustomNote(e.target.value)}
+                  placeholder="Any notes…"
+                  rows={2}
+                  className="border border-border rounded-lg px-3 py-2 w-full resize-y"
+                />
+              </label>
+              <label className="block mb-2">
+                <span className="text-sm text-muted block mb-1">Target day (optional)</span>
+                <input
+                  type="date"
+                  value={customTargetDay}
+                  onChange={(e) => setCustomTargetDay(e.target.value)}
+                  className="border border-border rounded-lg px-3 py-2 w-full"
+                />
+              </label>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <span className="text-sm text-muted">Link to contact (optional):</span>
                 {customPerson ? (
                   <span className="font-medium">{customPerson.nameListPreferred}</span>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={() => setShowPersonPicker(true)}
-                  className="text-primary font-medium text-sm min-h-tap"
-                >
-                  {customPerson ? 'Change person' : 'Pick person'}
+                <button type="button" onClick={() => setShowPersonPicker(true)} className="text-primary font-medium text-sm min-h-tap">
+                  {customPerson ? 'Change' : 'Pick contact'}
                 </button>
+                {customPerson && <button type="button" onClick={() => setCustomPerson(null)} className="text-muted text-sm min-h-tap">Clear</button>}
               </div>
-              <select
-                value={customType}
-                onChange={(e) => setCustomType(e.target.value)}
-                className="border border-border rounded-lg px-3 py-2 w-full max-w-xs mb-2"
-              >
-                {REACH_OUT_INTERVIEW_TYPES.map((t) => (
-                  <option key={t.type} value={t.type}>{t.name}</option>
-                ))}
-              </select>
               <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={addCustom}
-                  disabled={!customPerson}
-                  className="bg-primary text-white px-3 py-2 rounded-lg font-medium text-sm disabled:opacity-50"
-                >
-                  Add
-                </button>
-                <button type="button" onClick={() => { setShowAddCustom(false); setCustomPerson(null); }} className="border border-border px-3 py-2 rounded-lg text-sm">
-                  Cancel
-                </button>
+                <button type="button" onClick={addCustom} disabled={!customName.trim()} className="bg-primary text-white px-3 py-2 rounded-lg font-medium text-sm disabled:opacity-50">Add</button>
+                <button type="button" onClick={() => { setShowAddCustom(false); setCustomName(''); setCustomNote(''); setCustomTargetDay(''); setCustomPerson(null); }} className="border border-border px-3 py-2 rounded-lg text-sm">Cancel</button>
               </div>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => setShowAddCustom(true)}
-              className="inline-flex items-center gap-2 mt-3 text-primary font-semibold min-h-tap"
-            >
+            <button type="button" onClick={() => setShowAddCustom(true)} className="inline-flex items-center gap-2 mt-3 text-primary font-semibold min-h-tap">
               <Plus size={18} /> Add to checklist
             </button>
           )}
